@@ -1,11 +1,58 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """One bounded, nonmodal window; image panning never moves an overlay."""
+import configparser
 import ctypes
+import os
 from pathlib import Path
 from PyQt6 import sip
 from PyQt6.QtCore import Qt, QRectF, QPointF, QSize, QTimer, QEvent, QThreadPool, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QColor, QPainter, QImage, QTransform
 from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLayout
+
+
+def dolphin_window_size(screen):
+    """Dolphin's saved (unmaximized) main-window size for the current screen set."""
+    screens = QApplication.screens()
+    geometry = screen.geometry()
+    key = (f"{len(screens)} screens" if len(screens) > 1
+           else f"{geometry.width()}x{geometry.height()} screen")
+    home = Path.home()
+    state = Path(os.environ.get("XDG_STATE_HOME") or home/".local/state")/"dolphinstaterc"
+    config = Path(os.environ.get("XDG_CONFIG_HOME") or home/".config")/"dolphinrc"
+    for path, group in ((state, "State"), (config, "MainWindow")):
+        # KConfig keys such as "2 screens: Width" contain ':', so only '=' delimits.
+        parser = configparser.ConfigParser(interpolation=None, strict=False, delimiters=("=",))
+        parser.optionxform = str
+        try:
+            parser.read(path, encoding="utf-8")
+            width = int(parser[group][key+": Width"])
+            height = int(parser[group][key+": Height"])
+        except (KeyError, ValueError, OSError, configparser.Error):
+            continue
+        if width > 0 and height > 0:
+            return width, height
+    return None
+
+
+def preview_scale():
+    config = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home()/".config")/"kdeglance2/window.ini"
+    parser = configparser.ConfigParser(interpolation=None)
+    try:
+        parser.read(config, encoding="utf-8")
+        scale = float(parser.get("window", "scale", fallback="0.5"))
+    except (ValueError, OSError, configparser.Error):
+        scale = 0.5
+    return min(1.0, max(0.1, scale))
+
+
+def preview_size(screen, factor=1.0):
+    """Fixed window size per preview kind, so KWin's centering holds."""
+    area = screen.availableGeometry()
+    base = dolphin_window_size(screen) or (area.width()*0.6, area.height()*0.6)
+    scale = preview_scale() * factor
+    width = min(max(320, int(base[0]*scale)), max(1, area.width()-32))
+    height = min(max(220, int(base[1]*scale)), max(1, area.height()-32))
+    return QSize(width, height)
 
 
 class Canvas(QWidget):
@@ -147,6 +194,7 @@ class Canvas(QWidget):
 
 
 class PreviewWindow(QWidget):
+    size_factor = 1.25  # images and video get a larger window than audio/info panels
     animationError = pyqtSignal(str)
     outputChanged = pyqtSignal(object)
     exposed = pyqtSignal()
@@ -282,41 +330,31 @@ class PreviewWindow(QWidget):
         self.timer.start(self.frames[self.frame_index][1])
 
     def resize_to_image(self, image, screen):
-        available = screen.availableGeometry()
-        max_w, max_h = max(1, available.width()-32), max(1, available.height()-32)
-        # No chrome or minimum preview size; only rounding to whole logical pixels.
-        ratio = min(max_w/image.width(), max_h/image.height(), 1.0)
-        w, h = max(1, int(image.width()*ratio)), max(1, int(image.height()*ratio))
-        # Keep the initial scale independent of subsequent viewport growth.
-        # Otherwise resizing the window would apply the zoom a second time.
-        self.canvas.base_scale = min(w/image.width(), h/image.height(), 1.0)
-        # Publish matching native min/max constraints as well as requesting a
-        # size. A late Wayland configure for the loading surface must not leave
-        # an image-sized canvas in the old, smaller viewport.
-        self.apply_size(w, h)
+        box = preview_size(screen, self.size_factor)
+        # The window keeps the fixed preview size; the image is letterboxed.
+        # Keep the initial scale independent of subsequent zooming.
+        self.canvas.base_scale = min(box.width()/image.width(), box.height()/image.height(), 1.0)
+        self.apply_size(box.width(), box.height())
         if self.windowHandle() and self.windowHandle().screen() != screen:
             self.windowHandle().setScreen(screen)
         if self.canvas.zoom > 1:
             self.resize_for_zoom(screen)
 
     def resize_for_zoom(self, screen=None):
+        # Zoom stays inside the fixed window; resizing would undo KWin centering.
         if self.canvas.image.isNull() or self.canvas.base_scale is None:
             return
-        available = (screen or self.screen()).availableGeometry()
-        old = self.canvas.image_rect()
-        self.apply_size(max(1, min(int(old.width()), max(1, available.width()-32))),
-                        max(1, min(int(old.height()), max(1, available.height()-32))))
-        self.layout().activate()
-        # Retain the wheel anchor where the available panning range allows it.
-        new = self.canvas.image_rect()
-        self.canvas.pan += old.topLeft()-new.topLeft()
         self.canvas.clamp_pan()
         self.canvas.update()
 
+    def initial_size(self, screen):
+        # Sized before mapping: KWin centers a window only when it first appears.
+        return preview_size(screen, self.size_factor)
+
     def present(self, screen, token=""):
         if not self.isVisible():
-            self.apply_size(min(560, screen.availableGeometry().width()),
-                            min(360, screen.availableGeometry().height()))
+            box = self.initial_size(screen)
+            self.apply_size(box.width(), box.height())
         self.winId()  # Create a normal toplevel before selecting its output.
         if self.connected_handle is not self.windowHandle():
             self.connected_handle = self.windowHandle()

@@ -8,7 +8,7 @@ from PyQt6.QtGui import QPainter, QColor, QLinearGradient, QFont
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSlider, QGraphicsOpacityEffect, QSizePolicy
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput, QVideoSink, QVideoFrame
 from interactions import ActionButton, install_interactions
-from window import PreviewWindow
+from window import PreviewWindow, preview_size
 from audio import Artwork, SeekBar, IconButton, ControlSurface, VolumePanel, time_text
 
 
@@ -221,16 +221,13 @@ class VideoWindow(PreviewWindow):
             self.layout().activate()
             self.update_video_scale()
             return
-        area = screen.availableGeometry()
+        box = preview_size(screen, self.size_factor)
+        self.apply_size(box.width(), box.height())
         size = self.video_dimensions
         if size.isEmpty():
-            self.apply_size(min(560, max(1, area.width()-32)), min(360, max(1, area.height()-32)))
             return
-        # Match photo sizing: native logical size, downscale only to fit screen.
-        scale = min(1.0, max(1, area.width()-32)/size.width(),
-                    max(1, area.height()-32)/size.height())
-        self.apply_size(max(1, int(size.width()*scale)), max(1, int(size.height()*scale)))
-        self.canvas.base_scale = scale
+        # Match photo sizing: letterbox inside the fixed preview window.
+        self.canvas.base_scale = min(1.0, box.width()/size.width(), box.height()/size.height())
         if self.canvas.zoom > 1:
             self.resize_for_video_zoom()
 
@@ -243,12 +240,9 @@ class VideoWindow(PreviewWindow):
     def resize_for_video_zoom(self):
         if self.isFullScreen():
             return
-        rect = self.canvas.image_rect()
-        area = self.screen().availableGeometry()
-        self.apply_size(max(1,min(int(rect.width()),area.width()-32)), max(1,min(int(rect.height()),area.height()-32)))
-        self.layout().activate()
-        self.canvas.pan += rect.topLeft()-self.canvas.image_rect().topLeft()
+        # Zoom stays inside the fixed window; resizing would undo KWin centering.
         self.canvas.clamp_pan()
+        self.canvas.update()
 
     @pyqtSlot()
     def rotate_video(self):

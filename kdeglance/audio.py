@@ -8,7 +8,7 @@ from PyQt6.QtGui import QPainter, QColor, QLinearGradient, QFont, QImage
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QSlider, QToolTip, QApplication, QGraphicsOpacityEffect, QSizePolicy
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from audio_metadata import MetadataJob
-from window import PreviewWindow
+from window import PreviewWindow, preview_size
 from visuals import draw_icon, draw_audio_placeholder
 
 
@@ -178,6 +178,7 @@ class Artwork(QWidget):
 
 
 class AudioWindow(PreviewWindow):
+    size_factor = 1.0
     def __init__(self, close_callback, navigate_callback=None):
         super().__init__(close_callback, navigate_callback or (lambda _: None))
         old_canvas = self.canvas
@@ -290,9 +291,8 @@ class AudioWindow(PreviewWindow):
         self.resize_audio(screen)
 
     def resize_audio(self, screen):
-        area = screen.availableGeometry()
-        edge = max(1, min(760, area.width()-32, area.height()-32))
-        self.apply_size(edge, edge)
+        box = preview_size(screen)
+        self.apply_size(box.width(), box.height())
 
     def open_audio(self, path):
         self.stop_audio()
