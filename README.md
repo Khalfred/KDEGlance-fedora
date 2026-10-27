@@ -65,6 +65,27 @@ Dolphin's selected and current keyboard item in sync.
 
 ## Screenshots
 
+### This port
+
+Captured from the real preview windows in a Fedora-based Plasma 6 Wayland session,
+with KWin's placement and this port's window sizing. Only generated sample media,
+the project's own files and system files were used; see
+[screenshots/README.md](screenshots/README.md).
+
+| PDF with page sidebar | Code with syntax colors |
+| --- | --- |
+| ![PDF preview with page thumbnails](screenshots/port-pdf.png) | ![Highlighted code preview](screenshots/port-code.png) |
+
+| Executable | Folder |
+| --- | --- |
+| ![Information panel for an executable](screenshots/port-executable.png) | ![Information panel for a folder](screenshots/port-folder.png) |
+
+| Image in a window fitted to its shape | Vertical video |
+| --- | --- |
+| ![Fitted image preview](screenshots/port-image.png) | ![Vertical video preview](screenshots/port-video.png) |
+
+### Upstream 1.0.1
+
 These are captures of the real Qt widgets and media player, using the original
 synthetic media kept in the repository with the tests. They were captured offscreen, not drawn
 as interface mockups; native compositor effects/placement are not demonstrated.
