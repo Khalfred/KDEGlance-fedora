@@ -193,14 +193,14 @@ class Controller(QObject):
     def request(self, text, toggle):
         payload = json.loads(text)
         if not isinstance(payload, dict):
-            raise ValueError("Ожидается JSON-объект")
+            raise ValueError("Expected a JSON object")
         values = payload.get("paths", [])
         if not isinstance(values, list) or not 1 <= len(values) <= 128 or not all(isinstance(p, str) for p in values):
-            raise ValueError("paths должен содержать от 1 до 128 строк")
+            raise ValueError("paths must contain 1 to 128 strings")
         paths = list(dict.fromkeys(local_path(p) for p in values))
         ident = payload.get("request_id", "")
         if not isinstance(ident, str) or len(ident) > 128:
-            raise ValueError("Некорректный request_id")
+            raise ValueError("Invalid request_id")
         if ident and ident in self.seen:
             return {"ok": True, "ignored": "duplicate", **self.state()}
         if ident:
@@ -226,7 +226,7 @@ class Controller(QObject):
         self.screen_name = str(payload.get("screen_name", ""))[:256]
         token = payload.get("activation_token", "")
         if not isinstance(token, str) or len(token) > 8192 or "\0" in token:
-            raise ValueError("Некорректный activation_token")
+            raise ValueError("Invalid activation_token")
         self.activation_token_received = bool(token)
         LOG.info("open request activation_token_received=%s screen=%r", bool(token), self.screen_name)
         self.selected = paths
@@ -431,7 +431,7 @@ class Controller(QObject):
             self.window.stop_animation()
             self.window.canvas.reset_gesture()
         else:
-            self.window.clear_content("Загрузка…")
+            self.window.clear_content("Loading…")
         self.window.setWindowTitle(Path(path).name + " — KDEGlance")
         if present:
             self.window.present(self.screen(), token)
@@ -566,7 +566,7 @@ class Controller(QObject):
         if self.mode != "image":
             from PyQt6.QtWidgets import QToolTip
             QToolTip.showText(QCursor.pos(), order.error if order else
-                "Для навигации откройте файл из папки Dolphin через Space")
+                "To navigate, open the file from a Dolphin folder with Space")
             return
         if self.phase == "loading" or not self.playlist or self.path not in self.playlist:
             return
@@ -607,10 +607,10 @@ def main():
     app.setQuitOnLastWindowClosed(False)
     bus = QDBusConnection.sessionBus()
     if not bus.isConnected():
-        raise RuntimeError("Пользовательская D-Bus-сессия недоступна")
+        raise RuntimeError("User D-Bus session is not available")
     if not bus.registerService(BUS):
         if bus.interface().isServiceRegistered(BUS).value():
-            print("KDEGlance уже работает", file=sys.stderr)
+            print("KDEGlance is already running", file=sys.stderr)
             return 0
         raise RuntimeError(bus.lastError().message())
     state_dir = Path(os.environ.get("XDG_STATE_HOME") or Path.home()/".local/state") / "kdeglance2"

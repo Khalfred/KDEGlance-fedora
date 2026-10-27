@@ -88,12 +88,12 @@ class LoadJob(QRunnable):
         if self.cancelled.is_set():
             return {"cancelled": True}
         if not path.is_file():
-            raise ValueError("Файл не найден или недоступен")
+            raise ValueError("File not found or not accessible")
         if path.suffix.lower() not in EXTENSIONS:
-            raise ValueError("Неподдерживаемый формат изображения")
+            raise ValueError("Unsupported image format")
         is_cr2 = path.suffix.lower() in RAW_EXTENSIONS
         if path.suffix.lower()[1:].encode() not in [bytes(f) for f in QImageReader.supportedImageFormats()]:
-            raise ValueError("Для этого формата нужен декодер Qt (kimageformats, qt6-qtimageformats, qt6-qtsvg)")
+            raise ValueError("This format needs a Qt image decoder (kimageformats, qt6-qtimageformats, qt6-qtsvg)")
         signature = self.cache.signature(path) if self.cache else None
         cached = self.cache.get(self.path, signature) if self.cache else None
         if cached is not None:
@@ -122,7 +122,7 @@ class LoadJob(QRunnable):
         while not self.cancelled.is_set():
             image = reader.read()
             if image.isNull():
-                raise ValueError("Не удалось прочитать изображение: " + reader.errorString())
+                raise ValueError("Could not read image: " + reader.errorString())
             if (is_heif or is_cr2 or animated) and max(image.width(), image.height()) > MAX_EDGE:
                 image = image.scaled(MAX_EDGE, MAX_EDGE, Qt.AspectRatioMode.KeepAspectRatio,
                                      Qt.TransformationMode.SmoothTransformation)
@@ -134,7 +134,7 @@ class LoadJob(QRunnable):
                     streaming = True
                     frames = frames[:1]
                     break
-                raise ValueError("Изображение/анимация превышает лимит памяти или числа кадров")
+                raise ValueError("Image/animation exceeds the memory or frame-count limit")
             frames.append((image, max(20, reader.nextImageDelay())))
             if streaming:
                 break

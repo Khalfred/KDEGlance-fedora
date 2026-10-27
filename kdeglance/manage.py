@@ -122,11 +122,11 @@ def snapshot(paths):
     entries = {}
     for i, path in enumerate(dict.fromkeys(paths)):
         if path.is_symlink():
-            raise RuntimeError("Не заменяем чужую символическую ссылку: " + str(path))
+            raise RuntimeError("Refusing to replace a foreign symbolic link: " + str(path))
         item = {"existed": path.exists(), "copy": None}
         if path.exists():
             if not path.is_file():
-                raise RuntimeError("Ожидался обычный файл: " + str(path))
+                raise RuntimeError("Expected a regular file: " + str(path))
             destination = backup / str(i)
             shutil.copy2(path, destination)
             destination.chmod(0o600)
@@ -190,12 +190,12 @@ def install(isolated=False):
     from core import VERSION
     validate_root()
     if ROOT.exists() and not (ROOT/".owned-by-kdeglance2").exists():
-        raise RuntimeError("Каталог установки существует и не принадлежит этому установщику")
+        raise RuntimeError("The installation directory exists and is not owned by this installer")
     missing = [name for name in RUNTIME if not (SOURCE/name).exists()]
     if missing:
         raise RuntimeError("Missing runtime files: " + ", ".join(missing))
     if not (SOURCE/"libkdeglance_native.so").is_file():
-        raise RuntimeError("Сначала выполните python3 build_native.py; системные пакеты автоматически не устанавливаются")
+        raise RuntimeError("Run python3 build_native.py first; system packages are not installed automatically")
     files = generated()
     configs = [CONFIG/n for n in ("dolphinrc", "kglobalshortcutsrc", "kservicemenurc")]
     configs += [DATA/n for n in ("kxmlgui5/dolphin/dolphinui.rc", "kxmlgui6/dolphin/dolphinui.rc", "dolphin/dolphinui.rc")]
@@ -220,7 +220,7 @@ def install(isolated=False):
             shutil.copy2(SOURCE/name, release/name)
     old_release = os.readlink(CURRENT) if CURRENT.is_symlink() else None
     if CURRENT.exists() and not CURRENT.is_symlink():
-        raise RuntimeError("current должен быть ссылкой установщика")
+        raise RuntimeError("current must be an installer-owned link")
     link = ROOT/(".current-" + str(time.time_ns()))
     link.symlink_to(release)
     os.replace(link, CURRENT)
@@ -245,7 +245,7 @@ def install(isolated=False):
                     break
                 time.sleep(0.15)
             else:
-                raise RuntimeError("Новый процесс не отвечает: " + result.stderr)
+                raise RuntimeError("The new process is not responding: " + result.stderr)
         atomic(PROBE, files[PROBE], 0o700)
         changed.append(PROBE)
         installed = {str(p): digest(p) for p in files}
@@ -276,12 +276,12 @@ def rollback_integration():
     manifest = load_manifest()
     expected = manifest["installed"].get(str(PROBE))
     if PROBE.exists() and digest(PROBE) != expected:
-        raise RuntimeError("Действие изменено после установки; сохраните и проверьте его вручную")
+        raise RuntimeError("The action was changed after installation; save and review it manually")
     snapshot([PROBE])
     restore(PROBE, manifest["original"][str(PROBE)])
     manifest["installed"].pop(str(PROBE), None)
     atomic(MANIFEST, json.dumps(manifest, ensure_ascii=False, indent=2))
-    print("Исходный тестовый обработчик восстановлен; эксперимент и Space сохранены")
+    print("Original test handler restored; the experiment and Space binding were kept")
 
 
 def restore_dolphin():
@@ -289,15 +289,15 @@ def restore_dolphin():
     path = DATA/"applications/org.kde.dolphin.desktop"
     expected = manifest["installed"].get(str(path))
     if expected is None:
-        print("Ярлык Dolphin уже восстановлен или не менялся")
+        print("The Dolphin launcher is already restored or was never changed")
         return
     if path.exists() and digest(path) != expected:
-        raise RuntimeError("Ярлык Dolphin изменён пользователем; автоматическое восстановление остановлено")
+        raise RuntimeError("The Dolphin launcher was changed by the user; automatic restore stopped")
     snapshot([path])
     restore(path, manifest["original"][str(path)])
     manifest["installed"].pop(str(path), None)
     atomic(MANIFEST, json.dumps(manifest, ensure_ascii=False, indent=2))
-    print("Исходный пользовательский ярлык Dolphin восстановлен")
+    print("The original user Dolphin launcher was restored")
 
 
 def uninstall(isolated=False, purge=False):
@@ -313,7 +313,7 @@ def uninstall(isolated=False, purge=False):
     for name, expected in manifest["installed"].items():
         path = Path(name)
         if path.exists() and digest(path) != expected:
-            raise RuntimeError("Файл изменён пользователем; удаление остановлено: " + name)
+            raise RuntimeError("File changed by the user; removal stopped: " + name)
     retired = None
     original = manifest["original"].get(str(PROBE), {})
     if str(PROBE) in manifest["installed"] and original.get("existed"):
@@ -338,8 +338,8 @@ def uninstall(isolated=False, purge=False):
         shutil.rmtree(STATE)
     else:
         MANIFEST.unlink()
-    print("KDEGlance удалён; интеграция очищена/восстановлена. "
-          + ("Логи и снимки удалены." if purge else "Логи и резервные копии сохранены: " + str(STATE)))
+    print("KDEGlance removed; integration cleaned up/restored. "
+          + ("Logs and snapshots removed." if purge else "Logs and backups kept: " + str(STATE)))
 
 
 def main():
@@ -369,7 +369,7 @@ def main():
             restore_dolphin()
         elif args.command == "disable-autostart":
             systemctl("disable", "--now", "kdeglance2.service")
-            print("Автозапуск отключён; открытие через Dolphin по-прежнему может активировать D-Bus-сервис")
+            print("Autostart disabled; opening from Dolphin can still activate the D-Bus service")
         elif args.command == "enable-autostart":
             systemctl("enable", "--now", "kdeglance2.service")
         elif args.command == "status":

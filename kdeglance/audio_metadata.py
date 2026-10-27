@@ -25,7 +25,7 @@ class LimitedReader:
         if size < 0:
             size = max(0, os.fstat(self.file.fileno()).st_size-self.file.tell())
         if size > self.remaining:
-            raise ValueError("Лимит чтения метаданных")
+            raise ValueError("Metadata read limit reached")
         data = self.file.read(size)
         self.remaining -= len(data)
         return data

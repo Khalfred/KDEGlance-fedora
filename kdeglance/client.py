@@ -29,14 +29,14 @@ def main():
     parser.add_argument("command", choices=("open", "toggle", "close", "state"))
     parser.add_argument("paths", nargs="*")
     parser.add_argument("--request-id", default=None)
-    parser.add_argument("--no-activate", action="store_true", help="Диагностика: не передавать activation token")
+    parser.add_argument("--no-activate", action="store_true", help="Diagnostics: do not pass an activation token")
     args = parser.parse_args()
     token = os.environ.pop("XDG_ACTIVATION_TOKEN", "")
     app = QCoreApplication(["kdeglance2-client"])
     try:
         if args.command in ("open", "toggle"):
             if not args.paths:
-                parser.error("нужен хотя бы один путь")
+                parser.error("at least one path is required")
             # Read public KWin information before activation; no window mutations.
             msg = QDBusMessage.createMethodCall("org.kde.KWin", "/KWin", "org.kde.KWin", "activeOutputName")
             output = QDBusConnection.sessionBus().call(msg, QDBus.CallMode.Block, 100)
@@ -48,7 +48,7 @@ def main():
             result = call(args.command.capitalize(), payload)
         else:
             if args.paths:
-                parser.error("команда не принимает пути")
+                parser.error("this command takes no paths")
             result = call("GetState" if args.command == "state" else "Close")
         print(json.dumps(result, ensure_ascii=True))
         return 0 if result.get("ok", True) else 1

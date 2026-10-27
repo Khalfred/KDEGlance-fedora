@@ -15,8 +15,8 @@ class ActionButton(QPushButton):
         self.setFixedSize(30, 32)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        text = {"rotate": "Повернуть на 90° против часовой стрелки", "flip": "Отразить по горизонтали",
-                "fullscreen": "На весь экран / обычный размер"}[action]
+        text = {"rotate": "Rotate 90° counterclockwise", "flip": "Flip horizontally",
+                "fullscreen": "Fullscreen / normal size"}[action]
         self.setAccessibleName(text)
         self.setToolTip(text)
 

@@ -669,7 +669,7 @@ class ViewerTests(unittest.TestCase):
         self.assertEqual(result["decoded_size"], [80, 120])
         bad = self.home/"broken.heic"
         bad.write_bytes(b"not a HEIC file")
-        with self.assertRaisesRegex(ValueError, "Не удалось прочитать изображение"):
+        with self.assertRaisesRegex(ValueError, "Could not read image"):
             LoadJob(1, str(bad), [str(bad)]).decode()
 
     def test_22_heic_dbus_open_close_and_error(self):
@@ -1398,7 +1398,7 @@ class ViewerTests(unittest.TestCase):
             shutil.copy2(ROOT/"examples/audio/preview.wav", audio_only)
             window.open_video(str(audio_only))
             self.audio_wait(lambda: window.phase == "error")
-            self.assertIn("видеодорожки", window.error)
+            self.assertIn("video track", window.error)
             window.open_video(path)
             self.audio_wait(lambda: window.frames_received > 2)
             QApplication.sendEvent(window, QEvent(QEvent.Type.WindowActivate))
@@ -1731,7 +1731,7 @@ class ViewerTests(unittest.TestCase):
         self.request("Open", raw)
         state = self.ready()
         self.assertTrue(state["error"])
-        self.assertNotIn("Поддерживаются JPEG", state["error"])
+        self.assertNotIn("Unsupported image format", state["error"])
         self.request("Open", photo)
         self.assertEqual(self.ready()["phase"], "ready")
 

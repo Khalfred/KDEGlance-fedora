@@ -82,7 +82,7 @@ class DolphinOrder(QObject):
                     if not self.finished_preview:
                         self.ready.emit()
             else:
-                self.error = result.get("error", "Не удалось связаться с исходной папкой Dolphin")
+                self.error = result.get("error", "Could not reach the source Dolphin folder")
                 self.failed.emit(self.error)
                 if operation == "snapshot":
                     self.pending = None

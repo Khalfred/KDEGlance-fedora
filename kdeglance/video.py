@@ -41,7 +41,7 @@ class VideoCanvas(Artwork):
         elif not self.error:
             painter.setPen(QColor("#8793a2"))
             painter.setFont(QFont("sans-serif", 13))
-            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "Загрузка видео…")
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "Loading video…")
         shade = QLinearGradient(0, self.height()-104, 0, self.height())
         shade.setColorAt(0, QColor(0, 0, 0, 0))
         opacity = getattr(self, "controls_opacity", 1)
@@ -175,7 +175,7 @@ class VideoWindow(PreviewWindow):
         self.volume_slider = QSlider(Qt.Orientation.Vertical, self.volume_panel)
         self.volume_slider.setRange(0, 100)
         self.volume_slider.setValue(round(self.output.volume()*100))
-        self.volume_slider.setAccessibleName("Громкость")
+        self.volume_slider.setAccessibleName("Volume")
         self.volume_slider.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.volume_slider.setStyleSheet("""
             QSlider { background: transparent; }
@@ -309,7 +309,7 @@ class VideoWindow(PreviewWindow):
         self.volume_panel.hide()
         self.setWindowTitle(Path(path).name+" — KDEGlance")
         if not Path(path).is_file():
-            self.player_error(None, "Файл не найден или недоступен")
+            self.player_error(None, "File not found or not accessible")
             return
         self.player.setSource(QUrl.fromLocalFile(path))
         self.player.play()
@@ -370,14 +370,14 @@ class VideoWindow(PreviewWindow):
         if status == QMediaPlayer.MediaStatus.InvalidMedia:
             self.player_error(None, self.player.errorString())
         elif status in (QMediaPlayer.MediaStatus.LoadedMedia, QMediaPlayer.MediaStatus.BufferedMedia) and not self.player.hasVideo():
-            self.player_error(None, "В файле нет видеодорожки")
+            self.player_error(None, "The file has no video track")
         elif status == QMediaPlayer.MediaStatus.EndOfMedia:
             self.phase = "ready"
 
     @pyqtSlot(QMediaPlayer.Error, str)
     def player_error(self, _error, text):
         self.player.stop()
-        self.phase, self.error = "error", text or "Не удалось воспроизвести видео"
+        self.phase, self.error = "error", text or "Could not play video"
         self.canvas.error = self.error
         self.canvas.update()
         self.update_seekable()

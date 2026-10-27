@@ -31,7 +31,7 @@ class SeekBar(QWidget):
         self.setMouseTracking(True)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.setEnabled(False)
-        self.setAccessibleName("Перемотка")
+        self.setAccessibleName("Seek")
 
     def at(self, x):
         fraction = max(0.0, min(1.0, (x-8)/max(1, self.width()-16)))
@@ -85,8 +85,8 @@ class IconButton(QPushButton):
         self.setFixedSize(42, 42) if kind == "play" else self.setFixedSize(30, 32)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.setAccessibleName("Play/Pause" if kind == "play" else "Громкость")
-        self.setToolTip("Пауза / воспроизведение" if kind == "play" else "Громкость")
+        self.setAccessibleName("Play/Pause" if kind == "play" else "Volume")
+        self.setToolTip("Pause / play" if kind == "play" else "Volume")
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -250,7 +250,7 @@ class AudioWindow(PreviewWindow):
         self.volume_slider = QSlider(Qt.Orientation.Vertical, self.volume_panel)
         self.volume_slider.setRange(0, 100)
         self.volume_slider.setValue(round(self.output.volume()*100))
-        self.volume_slider.setAccessibleName("Громкость")
+        self.volume_slider.setAccessibleName("Volume")
         self.volume_slider.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.volume_slider.setStyleSheet("""
             QSlider { background: transparent; }
@@ -308,7 +308,7 @@ class AudioWindow(PreviewWindow):
         self.volume_panel.hide()
         self.setWindowTitle(Path(path).name+" — KDEGlance")
         if not Path(path).is_file():
-            self.player_error(None, "Файл не найден или недоступен")
+            self.player_error(None, "File not found or not accessible")
             return
         job = MetadataJob(self.generation, path)
         self.metadata_jobs[self.generation] = job
@@ -366,7 +366,7 @@ class AudioWindow(PreviewWindow):
 
     def player_error(self, _error, text):
         self.player.stop()
-        self.phase, self.error = "error", text or "Не удалось воспроизвести аудио"
+        self.phase, self.error = "error", text or "Could not play audio"
         self.canvas.error = self.error
         self.canvas.update()
         self.update_seekable()

@@ -64,7 +64,7 @@ def execute(request):
                 if window_call(path, "isItemVisibleInAnyView", GLib.Variant("(s)", (url,)))[0]:
                     candidates.append(path)
         if len(candidates) != 1:
-            raise RuntimeError("Не удалось однозначно найти исходное окно Dolphin для клавиатурного выбора")
+            raise RuntimeError("Could not reliably find the source Dolphin window for keyboard selection")
         window_call(candidates[0], "openFiles", GLib.Variant("(asb)", ([url], False)))
 
     current = Path(request["path"]).absolute()
@@ -94,19 +94,19 @@ def execute(request):
                 if depth < 13:
                     queue.extend((child, depth+1) for child in children(ref)[:60])
         if len(candidates) != 1:
-            raise RuntimeError("Не удалось однозначно получить порядок открытой папки Dolphin. Переоткройте Dolphin через ярлык.")
+            raise RuntimeError("Could not reliably read the order of the open Dolphin folder. Reopen Dolphin from its launcher.")
         context = candidates[0]
     if name(context["application"]).lower() != "dolphin" or context["directory"] != str(current.parent):
-        raise RuntimeError("Исходная папка Dolphin изменилась")
+        raise RuntimeError("The source Dolphin folder changed")
     view = context["view"]
     url = source_directory
     description = prop(view,accessible,"Description")
     if not any(description.endswith(u) for u in
                tuple(part+tail for part in (url.toDisplayString(),url.toString(QUrl.ComponentFormattingOption.FullyEncoded)) for tail in ("","/"))):
-        raise RuntimeError("Исходная папка Dolphin уже сменилась")
+        raise RuntimeError("The source Dolphin folder has already changed")
     entries = children(view)
     if len(entries) > 20000:
-        raise RuntimeError("Слишком много элементов в папке Dolphin для одного просмотра")
+        raise RuntimeError("Too many items in the Dolphin folder for one preview")
     ordered = []
     indices = {}
     for index, child in enumerate(entries):
@@ -118,22 +118,22 @@ def execute(request):
                 ordered.append(str(file))
                 indices[str(file)] = index
     if str(current) not in indices:
-        raise RuntimeError("Текущий файл больше не отображается в исходной папке Dolphin")
+        raise RuntimeError("The current file is no longer shown in the source Dolphin folder")
     if request.get("operation") == "select":
         # Do not replace a different, deliberate selection made by the user.
         allowed = {Path(p).name for p in request.get("allowed", [str(current)])}
         before = selected(view)
         if before not in allowed:
-            raise RuntimeError("Выделение Dolphin изменено пользователем")
+            raise RuntimeError("The Dolphin selection was changed by the user")
         select_current_item(context, current)
         if selected(view) != current.name:
-            raise RuntimeError("Dolphin не подтвердил выделение звучащего файла")
+            raise RuntimeError("Dolphin did not confirm selecting the playing file")
     result = {"ok": True, "context": context, "paths": ordered, "selected": str(current)}
     # AT-SPI FOCUSED (12) is Dolphin's current item, independent of selection.
     state = call(entries[indices[str(current)]], accessible, "GetState")[0]
     result["current_item_matches"] = bool(state[0] & (1 << 12))
     if request.get("operation") == "select" and not result["current_item_matches"]:
-        raise RuntimeError("Dolphin не подтвердил текущий файл для клавиатуры")
+        raise RuntimeError("Dolphin did not confirm the current keyboard item")
     return result
 
 

@@ -24,7 +24,7 @@ def fuse_call(method, value, timeout=30000):
         raise RuntimeError("KIO Fuse: " + reply.errorMessage())
     values = reply.arguments()
     if not values or not isinstance(values[0],str) or not values[0]:
-        raise RuntimeError("KIO Fuse не вернул путь к сетевому файлу")
+        raise RuntimeError("KIO Fuse did not return a path for the network file")
     return values[0]
 
 
@@ -32,12 +32,12 @@ def resolve_input(value):
     if value.lower().startswith("smb:"):
         url = QUrl(value)
         if not url.isValid() or url.scheme() != "smb" or not url.host() or not url.path().startswith("/"):
-            raise ValueError("Некорректный адрес SMB")
+            raise ValueError("Invalid SMB address")
         if url.hasQuery() or url.hasFragment():
-            raise ValueError("Специальные символы в имени SMB-файла должны быть URL-кодированы")
+            raise ValueError("Special characters in the SMB file name must be URL-encoded")
         path = fuse_call("mountUrl",url.toString(QUrl.ComponentFormattingOption.FullyEncoded))
         if not os.path.isabs(path):
-            raise RuntimeError("KIO Fuse вернул некорректный локальный путь")
+            raise RuntimeError("KIO Fuse returned an invalid local path")
         return local_path(path)
     return local_path(value)
 
@@ -48,7 +48,7 @@ def folder_url(path):
     if is_kio_fuse_path(path):
         url = QUrl(fuse_call("remoteUrl",directory,5000))
         if not url.isValid() or url.scheme() != "smb" or not url.host():
-            raise RuntimeError("Не удалось восстановить SMB-адрес исходной папки")
+            raise RuntimeError("Could not restore the SMB address of the source folder")
         return url.adjusted(QUrl.UrlFormattingOption.StripTrailingSlash)
     return QUrl.fromLocalFile(directory)
 

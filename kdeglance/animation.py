@@ -60,7 +60,7 @@ class AnimationStream(QRunnable):
                         return
                     image = reader.read()
                     if image.isNull():
-                        raise ValueError('Не удалось прочитать кадр анимации: '+reader.errorString())
+                        raise ValueError('Could not read animation frame: '+reader.errorString())
                     if image.size() != self.size:
                         image = image.scaled(self.size, Qt.AspectRatioMode.KeepAspectRatio,
                                              Qt.TransformationMode.SmoothTransformation)

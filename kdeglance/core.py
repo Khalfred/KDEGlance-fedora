@@ -47,14 +47,14 @@ def media_kind(path):
 
 def local_path(value):
     if not value or "\0" in value:
-        raise ValueError("Пустой путь или недопустимый нулевой символ")
+        raise ValueError("Empty path or invalid null character")
     if value.startswith("file:"):
         url = QUrl(value)
         if not url.isLocalFile() or url.host() not in ("", "localhost"):
-            raise ValueError("Поддерживаются только локальные файлы")
+            raise ValueError("Only local files are supported")
         value = url.toLocalFile()
     elif not os.path.isabs(value) and "://" in value:
-        raise ValueError("Поддерживаются только локальные файлы")
+        raise ValueError("Only local files are supported")
     # Literal percent signs and leading/trailing whitespace are preserved.
     return os.path.abspath(value)
 
