@@ -5,7 +5,7 @@ import threading
 from collections import OrderedDict
 from PyQt6.QtCore import QObject, QRunnable, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QImageReader
-from core import EXTENSIONS, MEDIA_EXTENSIONS, neighbours
+from core import EXTENSIONS, RAW_EXTENSIONS, ALL_FILES, neighbours
 
 MAX_EDGE = 4096
 MAX_ANIMATION_BYTES = 192 * 1024 * 1024
@@ -90,14 +90,14 @@ class LoadJob(QRunnable):
         if not path.is_file():
             raise ValueError("Файл не найден или недоступен")
         if path.suffix.lower() not in EXTENSIONS:
-            raise ValueError("Поддерживаются JPEG, PNG, WebP, BMP, GIF, HEIC/HEIF и Canon CR2")
-        is_cr2 = path.suffix.lower() == ".cr2"
-        if is_cr2 and b"cr2" not in QImageReader.supportedImageFormats():
-            raise ValueError("Для Canon CR2 необходим RAW-декодер Qt из пакета kimageformats")
+            raise ValueError("Неподдерживаемый формат изображения")
+        is_cr2 = path.suffix.lower() in RAW_EXTENSIONS
+        if path.suffix.lower()[1:].encode() not in [bytes(f) for f in QImageReader.supportedImageFormats()]:
+            raise ValueError("Для этого формата нужен декодер Qt (kimageformats, qt6-qtimageformats, qt6-qtsvg)")
         signature = self.cache.signature(path) if self.cache else None
         cached = self.cache.get(self.path, signature) if self.cache else None
         if cached is not None:
-            playlist = self.selected if len(self.selected) > 1 else neighbours(self.path, self.cancelled, MEDIA_EXTENSIONS if self.mixed else EXTENSIONS)
+            playlist = self.selected if len(self.selected) > 1 else neighbours(self.path, self.cancelled, ALL_FILES if self.mixed else EXTENSIONS)
             return {**cached, "error": "", "playlist": playlist,
                     "cache_hit": True, "cancelled": self.cancelled.is_set()}
         reader = QImageReader(str(path))
@@ -142,7 +142,7 @@ class LoadJob(QRunnable):
                 break
         if self.cancelled.is_set():
             return {"cancelled": True}
-        playlist = self.selected if len(self.selected) > 1 else neighbours(self.path, self.cancelled, MEDIA_EXTENSIONS if self.mixed else EXTENSIONS)
+        playlist = self.selected if len(self.selected) > 1 else neighbours(self.path, self.cancelled, ALL_FILES if self.mixed else EXTENSIONS)
         result = {"frames": frames, "loops": reader.loopCount(), "playlist": playlist,
                   "error": "", "decoded_size": [frames[0][0].width(), frames[0][0].height()],
                   "cache_hit": False}

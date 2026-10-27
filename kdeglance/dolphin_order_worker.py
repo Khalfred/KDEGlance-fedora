@@ -12,9 +12,9 @@ def execute(request):
     gi.require_version("Gio", "2.0")
     from gi.repository import Gio, GLib
     from PyQt6.QtCore import QUrl
-    from core import AUDIO_EXTENSIONS, EXTENSIONS, VIDEO_EXTENSIONS, MEDIA_EXTENSIONS
+    from core import AUDIO_EXTENSIONS, EXTENSIONS, VIDEO_EXTENSIONS, ALL_FILES
     from remote import folder_url, child_url
-    extensions = {"image": EXTENSIONS, "video": VIDEO_EXTENSIONS, "all": MEDIA_EXTENSIONS}.get(request.get("media"), AUDIO_EXTENSIONS)
+    extensions = {"image": EXTENSIONS, "video": VIDEO_EXTENSIONS, "all": ALL_FILES}.get(request.get("media"), AUDIO_EXTENSIONS)
     flags = Gio.DBusCallFlags.NONE
     session = Gio.bus_get_sync(Gio.BusType.SESSION, None)
     address = session.call_sync("org.a11y.Bus", "/org/a11y/bus", "org.a11y.Bus", "GetAddress",
@@ -114,7 +114,7 @@ def execute(request):
         if (filename and Path(filename).name == filename
                 and Path(filename).suffix.lower() in extensions):
             file = current.parent/filename
-            if file.is_file():
+            if file.is_file() or (extensions is ALL_FILES and file.is_dir()):
                 ordered.append(str(file))
                 indices[str(file)] = index
     if str(current) not in indices:

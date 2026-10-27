@@ -9,16 +9,40 @@ VERSION = "1.0.1"
 BUS = "io.github.KDEGlance2"
 OBJECT = "/io/github/KDEGlance2/Preview"
 INTERFACE = BUS + ".Preview1"
-EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif", ".heic", ".heif", ".cr2"}
-AUDIO_EXTENSIONS = {".mp3", ".flac", ".ogg", ".wav", ".m4a", ".aac"}
+RAW_EXTENSIONS = {".cr2", ".cr3", ".crw", ".dng", ".nef", ".nrw", ".arw", ".sr2", ".srf", ".orf",
+                  ".rw2", ".raf", ".pef", ".srw", ".x3f", ".3fr", ".erf", ".kdc", ".mrw"}
+EXTENSIONS = {".jpg", ".jpeg", ".jfif", ".png", ".webp", ".bmp", ".gif", ".heic", ".heif",
+              ".avif", ".jxl", ".tif", ".tiff", ".ico", ".cur", ".icns", ".svg", ".svgz", ".tga",
+              ".psd", ".exr", ".hdr", ".qoi", ".jp2", ".kra", ".ora", ".xcf", ".dds", ".pcx",
+              ".ppm", ".pgm", ".pbm", ".xpm"} | RAW_EXTENSIONS
+AUDIO_EXTENSIONS = {".mp3", ".flac", ".ogg", ".wav", ".m4a", ".aac", ".opus", ".oga", ".aiff",
+                    ".aif", ".aifc", ".wma", ".ape", ".wv", ".mka", ".m4b", ".amr", ".ac3", ".dsf"}
 VIDEO_EXTENSIONS = {".mp4", ".mkv", ".webm", ".avi", ".mov", ".m4v", ".mpeg", ".mpg", ".ts", ".mts", ".m2ts", ".ogv", ".3gp", ".wmv", ".flv", ".rmvb"}
 MEDIA_EXTENSIONS = EXTENSIONS | AUDIO_EXTENSIONS | VIDEO_EXTENSIONS
+PDF_EXTENSIONS = {".pdf"}
+MARKDOWN_EXTENSIONS = {".md", ".markdown", ".mdown", ".mkd"}
+OFFICE_EXTENSIONS = {".doc", ".docx", ".odt", ".rtf", ".xls", ".xlsx", ".ods", ".ppt", ".pptx", ".odp"}
+ARCHIVE_EXTENSIONS = {".zip", ".jar", ".apk", ".tar", ".tgz", ".gz", ".bz2", ".xz", ".zst", ".7z", ".rar", ".cbz"}
+
+
+class AllFiles:
+    """Extension filter that accepts every regular file (any-type document mode)."""
+    def __contains__(self, suffix):
+        return True
+
+
+ALL_FILES = AllFiles()
 
 
 def media_kind(path):
-    if Path(path).suffix.lower() in VIDEO_EXTENSIONS:
+    if os.path.isdir(path):
+        return "document"
+    suffix = Path(path).suffix.lower()
+    if suffix in VIDEO_EXTENSIONS:
         return "video"
-    return "audio" if Path(path).suffix.lower() in AUDIO_EXTENSIONS else "image"
+    if suffix in AUDIO_EXTENSIONS:
+        return "audio"
+    return "image" if suffix in EXTENSIONS else "document"
 
 
 def local_path(value):
@@ -47,7 +71,8 @@ def neighbours(path, cancelled, extensions=EXTENSIONS):
             for entry in entries:
                 if cancelled.is_set():
                     return [path]
-                if Path(entry.name).suffix.lower() in extensions and entry.is_file():
+                if (Path(entry.name).suffix.lower() in extensions and entry.is_file()
+                        and not (extensions is ALL_FILES and entry.name.startswith("."))):
                     result.append(entry.path)
     except OSError:
         return [path]

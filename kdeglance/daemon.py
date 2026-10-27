@@ -56,6 +56,9 @@ class Controller(QObject):
         self.video = None
         self.video_order = None
         self.video_pending_navigation = []
+        self.document = None
+        self.document_order = None
+        self.document_pending_navigation = []
         self.mode = "image"
         self.window = PreviewWindow(self.close_view, self.navigate)
         self.window.outputChanged.connect(self.output_changed)
@@ -88,6 +91,9 @@ class Controller(QObject):
         return self.app.screenAt(QCursor.pos()) or self.window.screen() or self.app.primaryScreen()
 
     def screen_changed(self):
+        if self.mode == "document" and self.document and self.document.isVisible():
+            self.document.resize_document(self.screen())
+            return
         if self.mode == "video" and self.video and self.video.isVisible():
             self.video.resize_video(self.screen())
             return
@@ -112,6 +118,19 @@ class Controller(QObject):
         return QImage(520, 300, QImage.Format.Format_RGB32)
 
     def state(self):
+        if self.mode == "document" and self.document:
+            return {"version": VERSION, "pid": os.getpid(), "module": "document",
+                    "path": self.path, "visible": self.document.isVisible(),
+                    "generation": self.generation, "platform": self.app.platformName(),
+                    "document": self.document.snapshot(),
+                    "phase": self.document.phase, "error": self.document.error,
+                    "window_size": [self.document.width(), self.document.height()],
+                    "active": self.document.isActiveWindow(),
+                    "activation_observed": self.document.activation_observed,
+                    "dolphin_order_ready": bool(self.document_order and self.document_order.paths),
+                    "dolphin_selection_synced": bool(self.document_order and self.document_order.selected == self.path),
+                    "window_count": sum(w.isVisible() for w in self.app.topLevelWidgets()
+                                        if isinstance(w, PreviewWindow))}
         if self.mode == "video" and self.video:
             return {"version": VERSION, "pid": os.getpid(), "module": "video",
                     "path": self.path, "visible": self.video.isVisible(),
@@ -199,6 +218,8 @@ class Controller(QObject):
             current = self.audio if self.mode == "audio" else self.window
             if self.mode == "video":
                 current = self.video
+            if self.mode == "document":
+                current = self.document
             if current and current.isVisible() and self.path == paths[0]:
                 self.close_view()
                 return {"ok": True, **self.state()}
@@ -215,7 +236,10 @@ class Controller(QObject):
         if media_kind(paths[0]) == "audio":
             self.open_audio(paths[0], token)
             return {"ok": True, **self.state()}
-        if self.mode in ("audio", "video"):
+        if media_kind(paths[0]) == "document":
+            self.open_document(paths[0], token)
+            return {"ok": True, **self.state()}
+        if self.mode in ("audio", "video", "document"):
             self.close_view()
         self.finish_image_selection()
         self.image_last_displayed = ""
@@ -244,15 +268,18 @@ class Controller(QObject):
             self.navigate(direction)
 
     def active_order(self):
-        return self.video_order if self.mode == "video" else self.audio_order if self.mode == "audio" else self.image_selection
+        return {"video": self.video_order, "audio": self.audio_order,
+                "document": self.document_order}.get(self.mode, self.image_selection)
 
     def show_navigation_target(self, path, order=None):
         mode = media_kind(path)
         if mode != self.mode:
             # Keep one folder snapshot/selection worker throughout mixed navigation.
-            self.audio_order = self.video_order = self.image_selection = None
+            self.audio_order = self.video_order = self.document_order = self.image_selection = None
             self.selected = [path]
-            if mode == "video":
+            if mode == "document":
+                self.open_document(path, "", order=order)
+            elif mode == "video":
                 self.open_video(path, "", order=order)
             elif mode == "audio":
                 self.open_audio(path, "", order=order)
@@ -264,7 +291,13 @@ class Controller(QObject):
                 self.load(path, present=True)
         else:
             self.path = path
-            if mode == "video":
+            if mode == "document":
+                self.document.open_document(path)
+                if self.document.initial_size(self.screen()) != self.document.size():
+                    # A different window size (e.g. text -> PDF) is re-presented so KWin centers it.
+                    self.document_order = None
+                    self.open_document(path, "", order=order)
+            elif mode == "video":
                 self.video.open_video(path)
             elif mode == "audio":
                 self.audio.open_audio(path)
@@ -309,6 +342,41 @@ class Controller(QObject):
             from PyQt6.QtWidgets import QToolTip
             QToolTip.showText(QCursor.pos(), error)
         self.video_pending_navigation = []
+
+    def open_document(self, path, token, order=None):
+        self.close_view()
+        if self.document is None:
+            from document import DocumentWindow
+            self.document = DocumentWindow(self.close_view, self.navigate)
+            self.document.focusLost.connect(lambda: self.close_view("focus-loss"))
+            self.document.outputChanged.connect(self.output_changed)
+        self.mode, self.path, self.phase, self.error = "document", path, "loading", ""
+        self.last_toggle, self.last_toggle_path = time.monotonic(), path
+        # Load first: paged documents choose their window size before it is mapped.
+        self.document.open_document(path)
+        self.document.present(self.screen(), token)
+        LOG.info("document path=%r kind=%s phase=%s", path, self.document.kind, self.document.phase)
+        if order is not None:
+            self.document_order = order
+        elif self.app.platformName() == "wayland":
+            from dolphin_order import DolphinOrder
+            order = DolphinOrder(path, self, media="all")
+            self.document_order = order
+            order.ready.connect(lambda: self.document_order_ready(order))
+            order.failed.connect(lambda error: self.document_order_failed(order, error))
+
+    def document_order_ready(self, order):
+        if order is not self.document_order or not self.document.isVisible():
+            return
+        pending, self.document_pending_navigation = self.document_pending_navigation, []
+        for direction in pending:
+            self.navigate(direction)
+
+    def document_order_failed(self, order, error):
+        if order is not self.document_order:
+            return
+        LOG.warning("Dolphin document order/selection: %s", error)
+        self.document_pending_navigation = []
 
     def open_audio(self, path, token, order=None):
         self.close_view()
@@ -446,6 +514,13 @@ class Controller(QObject):
         if self.video:
             self.video.stop_video()
             self.video.hide()
+        document_order, self.document_order = self.document_order, None
+        self.document_pending_navigation = []
+        if document_order:
+            document_order.idle.connect(document_order.deleteLater)
+            document_order.finish(self.path)
+        if self.document:
+            self.document.hide()
         self.finish_image_selection()
         order, self.audio_order = self.audio_order, None
         self.audio_pending_navigation = []
@@ -470,20 +545,22 @@ class Controller(QObject):
         LOG.info("closed reason=%s", reason)
 
     def navigate(self, direction):
-        current = self.video if self.mode == "video" else self.audio if self.mode == "audio" else self.window
+        current = {"video": self.video, "audio": self.audio,
+                   "document": self.document}.get(self.mode, self.window)
         if not current or not current.isVisible():
             return
         order = self.active_order()
         paths = getattr(order, "paths", [])
         if paths:
-            playlist = [p for p in paths if Path(p).is_file()]
+            playlist = [p for p in paths if Path(p).exists()]
             if self.path in playlist and len(playlist) > 1:
                 path = playlist[(playlist.index(self.path)+direction) % len(playlist)]
                 self.navigation_direction = direction
                 self.show_navigation_target(path, order)
             return
         if order and getattr(order, "process", None) is not None:
-            pending = self.video_pending_navigation if self.mode == "video" else self.audio_pending_navigation if self.mode == "audio" else self.image_pending_navigation
+            pending = {"video": self.video_pending_navigation, "audio": self.audio_pending_navigation,
+                       "document": self.document_pending_navigation}.get(self.mode, self.image_pending_navigation)
             pending.append(direction)
             return
         if self.mode != "image":
