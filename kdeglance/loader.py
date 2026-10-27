@@ -4,13 +4,31 @@ from pathlib import Path
 import threading
 from collections import OrderedDict
 from PyQt6.QtCore import QObject, QRunnable, QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QImageReader
+from PyQt6.QtGui import QImageIOHandler, QImageReader
 from core import EXTENSIONS, RAW_EXTENSIONS, ALL_FILES, neighbours
 
 MAX_EDGE = 4096
 MAX_ANIMATION_BYTES = 192 * 1024 * 1024
 MAX_FRAMES = 2000
 HEIF_EXTENSIONS = {".heic", ".heif"}
+
+
+def header_size(path):
+    """Displayed image size read from the file header only, or None when unknown.
+
+    HEIF and camera RAW handlers decode the whole image for size(), so they are skipped.
+    """
+    suffix = Path(path).suffix.lower()
+    if suffix in HEIF_EXTENSIONS or suffix in RAW_EXTENSIONS:
+        return None
+    reader = QImageReader(str(path))
+    reader.setAutoTransform(True)
+    size = reader.size()
+    if not size.isValid() or size.isEmpty():
+        return None
+    if reader.transformation() & QImageIOHandler.Transformation.TransformationRotate90:
+        size.transpose()  # EXIF-rotated photos are shown upright
+    return size
 
 
 class ImageCache:

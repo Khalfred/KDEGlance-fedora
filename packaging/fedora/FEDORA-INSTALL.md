@@ -58,8 +58,9 @@ journalctl --user -u kdeglance2.service -b --no-pager -n 50
   (Opus, AIFF, WMA, APE, WavPack, MKA, M4B …).
 - Text/Markdown/JSON/code use the same tall window as PDFs. Other previews use
   a fixed window based on half of Dolphin's saved (unmaximized) window size
-  (images and video 1.25× that), so KWin keeps it centered. Content is letterboxed and zoom stays
-  inside the window. Change the ratio in `~/.config/kdeglance2/window.ini`:
+  (images and video 1.25× that), so KWin keeps it centered. Image windows shrink
+  to the image's shape (read from the file header), so there are no black bars;
+  HEIC and camera RAW keep the fixed size. Zoom stays inside the window. Change the ratio in `~/.config/kdeglance2/window.ini`:
 
   ```ini
   [window]

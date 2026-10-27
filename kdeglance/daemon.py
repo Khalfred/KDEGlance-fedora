@@ -15,7 +15,7 @@ from PyQt6.QtDBus import QDBusConnection
 from PyQt6.QtGui import QImageReader, QCursor
 from PyQt6.QtWidgets import QApplication
 from core import VERSION, BUS, OBJECT, INTERFACE, local_path, media_kind
-from loader import LoadJob, ImageCache, HEIF_EXTENSIONS
+from loader import LoadJob, ImageCache, HEIF_EXTENSIONS, header_size
 from window import PreviewWindow
 
 LOG = logging.getLogger("kdeglance2")
@@ -425,6 +425,13 @@ class Controller(QObject):
         self.path, self.error, self.phase = path, "", "loading"
         self.pending_fit = None
         self.playlist = list(self.selected) if len(self.selected) > 1 else [path]
+        header = header_size(path)
+        if (self.window.isVisible()
+                and self.window.fitted_size(self.screen(), header) != self.window.size()):
+            # A differently shaped image is re-presented so KWin centers the new size.
+            self.window.hide()
+            present = True
+        self.window.content_size = header
         if self.window.isVisible() and self.window.frames:
             # Keep the previous image until the next complete frame is ready.
             # Even an 8 ms cache hit otherwise flashes the loading placeholder.

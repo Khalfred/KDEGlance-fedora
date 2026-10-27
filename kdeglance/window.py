@@ -193,6 +193,9 @@ class Canvas(QWidget):
         self.mousePressEvent(event)
 
 
+MIN_IMAGE_WINDOW = QSize(120, 90)  # still fits the rotate/flip buttons
+
+
 class PreviewWindow(QWidget):
     size_factor = 1.25  # images and video get a larger window than audio/info panels
     animationError = pyqtSignal(str)
@@ -206,6 +209,7 @@ class PreviewWindow(QWidget):
         self.activation_observed = False
         self.activation_epoch = 0
         self.target_size = None
+        self.content_size = None  # image size from the file header, known before mapping
         self.size_retries = 0
         self.size_timer = QTimer(self)
         self.size_timer.setSingleShot(True)
@@ -330,10 +334,14 @@ class PreviewWindow(QWidget):
         self.timer.start(self.frames[self.frame_index][1])
 
     def resize_to_image(self, image, screen):
-        box = preview_size(screen, self.size_factor)
-        # The window keeps the fixed preview size; the image is letterboxed.
+        # The window keeps the size chosen when it was shown (fitted to the image
+        # header); rotation or a late decode only rescales inside it.
         # Keep the initial scale independent of subsequent zooming.
-        self.canvas.base_scale = min(box.width()/image.width(), box.height()/image.height(), 1.0)
+        box = self.initial_size(screen)
+        low, high = sorted((box.width()/image.width(), box.height()/image.height()))
+        # Whole-pixel rounding of a fitted window leaves the axes <1% apart; fill it
+        # (clipping at most a pixel) rather than leave a thin bar.
+        self.canvas.base_scale = min(high if high/low < 1.01 else low, 1.0)
         self.apply_size(box.width(), box.height())
         if self.windowHandle() and self.windowHandle().screen() != screen:
             self.windowHandle().setScreen(screen)
@@ -347,9 +355,18 @@ class PreviewWindow(QWidget):
         self.canvas.clamp_pan()
         self.canvas.update()
 
+    def fitted_size(self, screen, content):
+        """The preview box shrunk to the content's aspect, so images get no bars."""
+        box = preview_size(screen, self.size_factor)
+        if content is None or content.isEmpty():
+            return box
+        scale = min(box.width()/content.width(), box.height()/content.height(), 1.0)
+        return QSize(min(box.width(), max(MIN_IMAGE_WINDOW.width(), round(content.width()*scale))),
+                     min(box.height(), max(MIN_IMAGE_WINDOW.height(), round(content.height()*scale))))
+
     def initial_size(self, screen):
         # Sized before mapping: KWin centers a window only when it first appears.
-        return preview_size(screen, self.size_factor)
+        return self.fitted_size(screen, self.content_size)
 
     def present(self, screen, token=""):
         if not self.isVisible():

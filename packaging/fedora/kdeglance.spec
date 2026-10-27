@@ -7,7 +7,7 @@
 
 Name:           kdeglance
 Version:        1.0.1
-Release:        8%{?dist}
+Release:        9%{?dist}
 Summary:        Quick Look-style file preview for KDE Plasma and Dolphin
 License:        GPL-3.0-or-later
 URL:            https://github.com/AlexGraveler/KDEGlance
@@ -119,6 +119,10 @@ grep -q '%{_docdir}/%{name}/FEDORA-INSTALL.md' %{buildroot}%{_prefix}/lib/kdegla
 %{_datadir}/kio/servicemenus/kdeglance-space-probe.desktop
 
 %changelog
+* Tue Oct 27 2026 Khalfred <238867466+Khalfred@users.noreply.github.com> - 1.0.1-9
+- Image windows fit the image's shape (no black bars); a differently shaped
+  image is re-shown so KWin keeps it centered
+
 * Tue Oct 27 2026 Khalfred <238867466+Khalfred@users.noreply.github.com> - 1.0.1-8
 - Translate all user-visible messages, tooltips and log warnings to English
 
