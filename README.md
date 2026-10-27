@@ -4,7 +4,7 @@
 > Please report problems with this port here, not upstream.
 >
 > **Modified work notice (GPL-3.0-or-later, section 5a):** modified in October 2026
-> from upstream v1.0.1 on the `fedora` branch. The changes were written with AI
+> from upstream v1.0.1. The changes were written with AI
 > assistance (Claude). Upstream history and authorship are preserved in the git log.
 >
 > Changes in this port:
@@ -14,33 +14,48 @@
 >   turn pages), text/code/JSON/Markdown, and archive listings.
 > - An information panel (thumbnail and properties) for folders, executables and
 >   any other file; the Dolphin action is offered for every file and folder.
-> - More image and audio formats.
-> - Fixed, centered window sizes based on Dolphin's window size.
+> - More image and audio formats; syntax-highlighted code previews.
+> - Centered windows fitted to each image and video, sized from Dolphin's window.
+> - English messages throughout.
 >
-> The upstream README follows unchanged.
+> The README below is upstream's, adapted for this port. The original is in the
+> [upstream repository](https://github.com/AlexGraveler/KDEGlance).
 
 # KDEGlance
 
 **Quick Look-style file preview for KDE Plasma and Dolphin**
 
 KDEGlance **1.0.1** opens a borderless preview of the selected file in Dolphin.
-Preview an image, listen to audio, or watch a video without opening a full editor
-or media-library application. Move through a mixed folder while keeping
+Preview an image, a document or code, listen to audio, or watch a video without
+opening a full editor or media-library application. Move through a mixed folder while keeping
 Dolphin's selected and current keyboard item in sync.
 
 ## Features
 
-- Images: JPEG/JPG, PNG, WebP, BMP, GIF, HEIC/HEIF and Canon CR2, subject to
-  installed Qt image plugins. Automatic EXIF orientation and bounded decoding.
+- Images: JPEG/JPG, PNG, WebP, BMP, GIF, HEIC/HEIF, AVIF, JXL, TIFF, SVG, PSD,
+  EXR, QOI and camera RAW (CR2, CR3, NEF, ARW, DNG, …), subject to installed Qt
+  image plugins. Automatic EXIF orientation and bounded decoding.
 - Animated GIFs, including long/large animations decoded ahead through a small
   worker-thread buffer instead of loading every frame into memory.
 - Pointer-centered image zoom, panning, counterclockwise rotation and horizontal
   reflection. Transformations affect the preview; files are not edited.
-- Audio: MP3, FLAC, OGG, WAV, M4A and AAC; embedded covers or a glass-style
-  placeholder, play/pause, seeking, and volume control.
+- Audio: MP3, FLAC, OGG, WAV, M4A, AAC, Opus, AIFF, WMA, APE, WavPack, MKA and
+  M4B; embedded covers or a glass-style placeholder, play/pause, seeking, and
+  volume control.
 - Video: MP4, MKV, WebM, AVI, MOV, M4V, MPEG/MPG, TS/MTS/M2TS, OGV, 3GP,
   WMV, FLV and RMVB. Actual decoding depends on the system's Qt Multimedia/FFmpeg
   backend and codecs. Natural-aspect previews, rotation, fullscreen and zoom.
+- PDF and office documents (DOCX, ODT, XLSX, PPTX, … converted with LibreOffice
+  and cached): one whole page at a time with a page-thumbnail sidebar.
+- Code, JSON and other source files with syntax highlighting and line numbers,
+  in the color theme of the file's default editor (Kate's theme for Kate/KWrite).
+  Plain text and rendered Markdown.
+- ZIP, tar and 7z archive listings.
+- An information panel for folders, executables (ELF/AppImage/Windows PE/scripts),
+  launchers and any other file: thumbnail plus type, size, folder contents,
+  location, dates, permissions and owner.
+- Centered windows fitted to each image and video (no black bars); vertical videos
+  get a larger window. Sizes derive from Dolphin's saved window size.
 - Frameless movable windows, focus-loss closing, and controls that fade on
   inactivity or when the pointer leaves the preview.
 - Explicit mixed-file navigation and Dolphin selection synchronization. Merely
@@ -66,36 +81,32 @@ as interface mockups; native compositor effects/placement are not demonstrated.
 
 ## Installation
 
-For the smallest download, use `KDEGlance-1.0.1.tar.gz` from the project's
-GitHub Releases once published. It contains the full required application source,
-installer and license notices, without developer tests, screenshots or example
-media. Extract it and run `bash install.sh` in the extracted folder.
-The repository keeps the full documentation, Markdown screenshots and developer
-tests; they are not installed or included in the user archive.
-
-On CachyOS or Arch Linux, in a normal KDE Plasma Wayland user session:
+On Fedora KDE, in a normal Plasma Wayland user session:
 
 ```bash
-git clone https://github.com/AlexGraveler/KDEGlance.git
-cd KDEGlance
-bash install.sh
+sudo dnf install rpm-build rpmdevtools gcc-c++ qt6-qtbase-devel \
+    kf6-kwindowsystem-devel desktop-file-utils python3 git
+git clone https://github.com/Khalfred/KDEGlance-fedora.git
+cd KDEGlance-fedora
+bash packaging/fedora/build.sh
+sudo dnf install ~/rpmbuild/RPMS/x86_64/kdeglance-1.0.1-*.x86_64.rpm
 ```
 
-The installer checks dependencies, offers the exact `pacman` command if packages
-are missing, builds the small activation bridge locally, and asks before changing
-user integration. Do **not** run the whole installer as root.
+`dnf` installs the runtime dependencies. Installing the package does not change
+HOME, keyboard shortcuts or running services. Then, as your normal user:
 
-A read-only check is available with `bash install.sh --check`.
-See [INSTALL.md](INSTALL.md) for requirements, manual Space binding, updates and removal.
+```bash
+kdeglance-setup --enable-dolphin
+kbuildsycoca6 --noincremental
+```
 
-## Arch package preparation
+Fully quit and reopen Dolphin. See
+[FEDORA-INSTALL.md](packaging/fedora/FEDORA-INSTALL.md) for updates, codecs,
+settings, migrating from a manual install, and removal.
 
-A `kdeglance` 1.0.1-1 PKGBUILD and generated `.SRCINFO` are prepared in
-[packaging/aur](packaging/aur). See the [package testing and migration guide](packaging/aur/AUR-INSTALL.md).
-This is a local preparation awaiting real laptop acceptance, not an AUR publication.
-The original manual installer remains available and unchanged. Package installation
-does not assign shortcuts, start services or modify user files; optional per-user
-Dolphin setup is explicit and reversible.
+Upstream's Arch/CachyOS installer (`install.sh`, [INSTALL.md](INSTALL.md)) and
+Arch packaging ([packaging/aur](packaging/aur)) are kept for reference; the
+installer refuses to run on Fedora.
 
 ## Usage
 
@@ -104,12 +115,12 @@ search for **KDEGlance: Quick Look** (or its translated name), and assign **Spac
 Review any shortcut conflict in Dolphin's dialog rather than overwriting it blindly.
 The installer deliberately does not edit shortcut configuration files.
 
-Select a supported file and press Space. Use the preview controls or arrow keys.
+Select any file or folder and press Space. Use the preview controls or arrow keys.
 Close with Space, Escape, a center click, or by moving focus to another application.
 Dolphin's selection remains on the last successfully previewed image/accepted media
 item when synchronization with the original folder is available.
 
-CLI examples (ensure `~/.local/bin` is on PATH):
+CLI examples:
 
 ```bash
 kdeglance --version
@@ -125,7 +136,10 @@ kdeglance state
 | --- | --- |
 | Space | Open from Dolphin after manual binding; close an active preview |
 | Escape | Close; in fullscreen video, leave fullscreen first |
-| Left / Right | Previous / next supported item, including mixed media |
+| Left / Right | Previous / next item, including mixed media |
+| Left / Right / Up / Down, PageUp / PageDown | In PDF and office documents: previous / next page; past the first / last page, previous / next file |
+| Home / End | In PDF and office documents: first / last page |
+| Mouse wheel on a document page | Previous / next page |
 | Center image/cover click | Close preview |
 | Left / right area click | Previous / next item (outside the controls) |
 | Mouse wheel on image/video | Zoom around the pointer |
@@ -144,27 +158,31 @@ kdeglance state
 
 ## Requirements
 
-- CachyOS or Arch Linux, KDE Plasma **6**, Dolphin **24.02+**, Wayland.
-- Python **3.10+**, PyQt6/Qt **6.8+**, Qt Multimedia, image-format plugins.
+- Fedora KDE (Plasma **6**, Dolphin **24.02+**) in a Wayland session.
+- Python **3.10+**, PyQt6/Qt **6.8+** with Qt Multimedia and Qt PDF, image-format
+  plugins (`qt6-qtimageformats`, `kf6-kimageformats`, `qt6-qtsvg`).
 - PyGObject/Gio, AT-SPI accessibility for Dolphin order/current-item integration.
 - A user D-Bus session and user systemd manager; KIO Fuse/KIO extras for SMB.
-- A C++ compiler, pkg-config, Qt/KF6 WindowSystem headers for the local activation
-  bridge build. No precompiled developer `.so` is distributed.
-- Pure-Python Mutagen **1.48.1** is bundled with its upstream license notices.
+- Build only: a C++ compiler, pkg-config and Qt/KF6 WindowSystem headers for the
+  activation bridge. No precompiled `.so` is distributed.
+- Optional, recommended by the package: LibreOffice (office documents), 7-Zip
+  (7z/RAR listings), `ffprobe` from FFmpeg (fitted video windows) and
+  `kf6-syntax-highlighting` (code colors). Fedora's default FFmpeg lacks
+  H.264/HEVC; see FEDORA-INSTALL.md for the RPM Fusion codecs.
 
-Exact Arch package names are listed in [INSTALL.md](INSTALL.md) and checked by
-the installer. Git is needed only for cloning, not for installing an extracted
-archive. Codex, pip, virtual environments and a Python package index are not required.
+The exact Fedora package names are in
+[packaging/fedora/kdeglance.spec](packaging/fedora/kdeglance.spec); `dnf` resolves
+them. The package uses the system Mutagen; a bundled copy (1.48.1) remains in the
+source with its license notices.
 
 ## Supported Distributions
 
 | Distribution | Status |
 | --- | --- |
-| CachyOS, Plasma 6 / Wayland | Tested development/runtime baseline; release tests run here |
-| Arch Linux, Plasma 6 / Wayland | Supported target; expected to work with the listed packages; no separate clean-machine test |
-| Fedora KDE | Experimental work exists; not officially supported by this release/installer |
-| Kubuntu | Planned; not officially supported |
-| Other desktops / Plasma X11 | Not part of the supported configuration |
+| Fedora KDE 44, Plasma 6 / Wayland | Supported target of this port. Developed and tested on Ultramarine 44 (Fedora 44 KDE base, same packages); not yet tested on a clean stock Fedora install |
+| Other Fedora releases / Fedora-based KDE spins | Expected to work with the RPM if Qt/PyQt are 6.8+; not tested |
+| Arch Linux / CachyOS | Use [upstream KDEGlance](https://github.com/AlexGraveler/KDEGlance); this port's changes are not tested there |
+| Kubuntu, Plasma X11, other desktops | Not supported |
 
 ## Known Limitations
 
@@ -175,13 +193,16 @@ archive. Codex, pip, virtual environments and a Python package index are not req
   media navigation may be unavailable. No polling of arbitrary selection occurs.
 - SMB is handled by KIO Fuse. This is not universal KIO/AFC support and has not
   been validated with a physical iPhone. A slow Fuse request may delay opening.
-- Wayland placement and screen constraints are managed by KWin; this release does
-  not promise universal centered placement on other distributions/compositors.
+- Wayland placement and screen constraints are managed by KWin, which centers a
+  window only when it first appears; previews are therefore sized before they are
+  shown. HEIC/HEIF and camera RAW images keep a fixed window size.
 - Initial image decoding is bounded to a 4096-pixel edge. Large GIFs use a bounded
   buffer; slow storage/decoding may reduce playback speed. Not all installed
   image plugins support every variant of their nominal file formats.
-- Text/PDF previews, playlists/libraries, editing/saving, and archive browsing
-  are outside this release.
+- Playlists/libraries, editing/saving, and opening files inside archives are not
+  supported; archives are listed only.
+- Code colors cannot reproduce JetBrains or other non-KDE editor themes exactly;
+  choose a close KSyntaxHighlighting theme in `~/.config/kdeglance2/window.ini`.
 
 ## Testing and Contributing
 
