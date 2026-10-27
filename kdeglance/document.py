@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (QAbstractItemView, QAbstractScrollArea, QFormLayout
                              QLabel, QListWidget, QListWidgetItem, QPlainTextEdit, QSizePolicy,
                              QTextBrowser, QVBoxLayout, QWidget)
 from core import ARCHIVE_EXTENSIONS, MARKDOWN_EXTENSIONS, OFFICE_EXTENSIONS, PDF_EXTENSIONS
+import highlight
 from fileinfo import FolderScan, binary_format, cached_thumbnail, desktop_icon_name, permissions
 from window import PreviewWindow, preview_size
 
@@ -152,6 +153,7 @@ class DocumentWindow(PreviewWindow):
         self.process_timer.setSingleShot(True)
         self.process_timer.timeout.connect(self.conversion_timeout)
         self.phase, self.path, self.error, self.kind = "idle", "", "", ""
+        self.theme = ""
         self.generation = 0
         self.folder_scan = None
         self.folder_pool = QThreadPool(self)
@@ -201,6 +203,27 @@ class DocumentWindow(PreviewWindow):
             view.setPlainText(text)
         view.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.set_content(view)
+
+    def show_code(self, ok, output, text):
+        """Highlighted code with line numbers, in the colors of the chosen editor theme."""
+        parsed = highlight.with_line_numbers(output) if ok else None
+        if parsed is None:
+            self.kind = "text"
+            self.show_text(text)
+            self.ready()
+            return
+        background, foreground, code = parsed
+        font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
+        view = QTextBrowser(self.canvas)
+        view.setOpenLinks(False)
+        view.setLineWrapMode(QTextBrowser.LineWrapMode.NoWrap)
+        view.document().setDefaultFont(font)
+        view.setStyleSheet(f"QTextBrowser {{ background: {background}; color: {foreground}; "
+                           "border: none; padding: 6px; }")
+        view.setHtml(f'<pre style="font-family:\'{font.family()}\'; margin:0">{code}</pre>')
+        view.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.set_content(view)
+        self.ready()
 
     def show_pdf(self, path):
         self.pdf.close()
@@ -451,8 +474,15 @@ class DocumentWindow(PreviewWindow):
                 text = raw[:MAX_TEXT_BYTES].decode("utf-8", "replace")
                 if len(raw) > MAX_TEXT_BYTES:
                     text += f"\n\n[… preview truncated at {human_size(MAX_TEXT_BYTES)}]"
-                self.show_text(text, markdown=self.kind == "markdown")
-                self.ready()
+                if (self.kind == "text" and highlight.available()
+                        and file.stat().st_size <= highlight.MAX_HIGHLIGHT_BYTES):
+                    self.kind = "code"
+                    self.theme = highlight.choose_theme(QMimeDatabase().mimeTypeForFile(str(file)).name())
+                    self.run_process(highlight.TOOL, ["-t", self.theme, str(file)],
+                                     lambda ok, output: self.show_code(ok, output, text), "")
+                else:
+                    self.show_text(text, markdown=self.kind == "markdown")
+                    self.ready()
             else:
                 self.kind = "info"
                 self.show_info(file)
@@ -665,7 +695,7 @@ class DocumentWindow(PreviewWindow):
         event.accept()
 
     def snapshot(self):
-        return {"phase": self.phase, "error": self.error, "kind": self.kind,
+        return {"phase": self.phase, "error": self.error, "kind": self.kind, "theme": self.theme,
                 "sidebar_pages": self.pages.count() if self.pages is not None else 0,
                 "current_page": self.current_page(), "sidebar_row": self.pages.currentRow() if self.pages is not None else -1,
                 "thumbnails_pending": len(self.thumbnail_queue),

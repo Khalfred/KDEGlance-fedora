@@ -66,6 +66,21 @@ journalctl --user -u kdeglance2.service -b --no-pager -n 50
   scale=0.7
   ```
 
+## Code colors
+
+Code, JSON and other source files are highlighted with line numbers by
+KSyntaxHighlighting, the engine Kate/KWrite/KDevelop use. The theme follows the
+file's default editor: Kate/KWrite → Kate's configured color theme (exactly
+what Kate shows), VS Code/VSCodium → VSCodium Dark, anything else → Breeze
+Dark/Light to match the desktop. Pick any theme from
+`ksyntaxhighlighter6 --list-themes` instead with:
+
+```ini
+# ~/.config/kdeglance2/window.ini
+[code]
+theme=Tokyo Night
+```
+
 ## Codecs
 
 Fedora's stock FFmpeg is codec-limited (no H.264/HEVC). For full video playback,

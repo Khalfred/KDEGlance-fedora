@@ -7,7 +7,7 @@
 
 Name:           kdeglance
 Version:        1.0.1
-Release:        6%{?dist}
+Release:        7%{?dist}
 Summary:        Quick Look-style file preview for KDE Plasma and Dolphin
 License:        GPL-3.0-or-later
 URL:            https://github.com/AlexGraveler/KDEGlance
@@ -46,6 +46,8 @@ Requires:       plasma-workspace >= 6
 # Office documents are converted to PDF; without it only their text is shown.
 Recommends:     libreoffice-core
 Recommends:     libreoffice-writer
+# Code previews use Kate's highlighting engine; plain text without it.
+Recommends:     kf6-syntax-highlighting
 # 7z/RAR archive listings; ZIP and tar work without it.
 Recommends:     7zip
 
@@ -77,7 +79,7 @@ cd kdeglance
 %install
 pkglib=%{buildroot}%{_prefix}/lib/kdeglance
 for module in core loader window daemon client audio audio_metadata dolphin_order \
-    dolphin_order_worker video interactions remote animation visuals legacy document fileinfo; do
+    dolphin_order_worker video interactions remote animation visuals legacy document fileinfo highlight; do
   install -Dpm644 kdeglance/$module.py $pkglib/$module.py
 done
 install -Dpm755 kdeglance/libkdeglance_native.so $pkglib/libkdeglance_native.so
@@ -117,6 +119,10 @@ grep -q '%{_docdir}/%{name}/FEDORA-INSTALL.md' %{buildroot}%{_prefix}/lib/kdegla
 %{_datadir}/kio/servicemenus/kdeglance-space-probe.desktop
 
 %changelog
+* Tue Oct 27 2026 Khalfred <238867466+Khalfred@users.noreply.github.com> - 1.0.1-7
+- Syntax-highlighted code previews with line numbers (KSyntaxHighlighting),
+  using Kate's theme when Kate/KWrite is the file's default editor
+
 * Tue Oct 27 2026 Khalfred <238867466+Khalfred@users.noreply.github.com> - 1.0.1-6
 - Build from the fedora branch via git archive instead of a patch (no functional change)
 
