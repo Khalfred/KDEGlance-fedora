@@ -1,3 +1,24 @@
+> [!IMPORTANT]
+> **This is an unofficial Fedora KDE port of [KDEGlance](https://github.com/AlexGraveler/KDEGlance)
+> by AlexGraveler.** It is not affiliated with or endorsed by the original author.
+> Please report problems with this port here, not upstream.
+>
+> **Modified work notice (GPL-3.0-or-later, section 5a):** modified in October 2026
+> from upstream v1.0.1 on the `fedora` branch. The changes were written with AI
+> assistance (Claude). Upstream history and authorship are preserved in the git log.
+>
+> Changes in this port:
+> - Fedora RPM packaging in [packaging/fedora](packaging/fedora) — see
+>   [FEDORA-INSTALL.md](packaging/fedora/FEDORA-INSTALL.md).
+> - Previews for PDF and office documents (page-thumbnail sidebar, arrow keys
+>   turn pages), text/code/JSON/Markdown, and archive listings.
+> - An information panel (thumbnail and properties) for folders, executables and
+>   any other file; the Dolphin action is offered for every file and folder.
+> - More image and audio formats.
+> - Fixed, centered window sizes based on Dolphin's window size.
+>
+> The upstream README follows unchanged.
+
 # KDEGlance
 
 **Quick Look-style file preview for KDE Plasma and Dolphin**
