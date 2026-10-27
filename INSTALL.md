@@ -1,3 +1,8 @@
+> [!NOTE]
+> **Fedora users:** this file documents upstream's Arch/CachyOS installer (`install.sh`),
+> which refuses to run on Fedora. Follow
+> [packaging/fedora/FEDORA-INSTALL.md](packaging/fedora/FEDORA-INSTALL.md) instead.
+
 # Installation — KDEGlance 1.0.1
 
 ## Supported setup

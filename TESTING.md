@@ -1,3 +1,8 @@
+> [!NOTE]
+> This file describes upstream's Arch/CachyOS test suite. It has not been adapted
+> to or run on Fedora in this port; see [CONTRIBUTING.md](CONTRIBUTING.md) for how
+> changes are tested here.
+
 # Testing KDEGlance 1.0.1
 
 ## Automated checks
