@@ -299,6 +299,10 @@ class Controller(QObject):
                     self.open_document(path, "", order=order)
             elif mode == "video":
                 self.video.open_video(path)
+                if not self.video.isFullScreen() and self.video.initial_size(self.screen()) != self.video.size():
+                    # A differently shaped video is re-presented so KWin centers it.
+                    self.video_order = None
+                    self.open_video(path, "", order=order)
             elif mode == "audio":
                 self.audio.open_audio(path)
             else:

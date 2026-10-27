@@ -60,7 +60,9 @@ journalctl --user -u kdeglance2.service -b --no-pager -n 50
   a fixed window based on half of Dolphin's saved (unmaximized) window size
   (images and video 1.25× that), so KWin keeps it centered. Image windows shrink
   to the image's shape (read from the file header), so there are no black bars;
-  HEIC and camera RAW keep the fixed size. Zoom stays inside the window. Change the ratio in `~/.config/kdeglance2/window.ini`:
+  HEIC and camera RAW keep the fixed size. Videos are fitted the same way using
+  ffprobe (phone rotation and pixel aspect included), and vertical videos get a
+  15% larger window. Zoom stays inside the window. Change the ratio in `~/.config/kdeglance2/window.ini`:
 
   ```ini
   [window]

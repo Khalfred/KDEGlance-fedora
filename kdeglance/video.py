@@ -1,16 +1,52 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Independent video preview with the accepted music controls, left unchanged."""
+import json
 import math
 import os
 from pathlib import Path
+import subprocess
 from PyQt6.QtCore import Qt, QPoint, QPointF, QEvent, QTimer, QSettings, QUrl, QRectF, QSize, QPropertyAnimation, QEasingCurve, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QPainter, QColor, QLinearGradient, QFont
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSlider, QGraphicsOpacityEffect, QSizePolicy
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput, QVideoSink, QVideoFrame
 from interactions import ActionButton, install_interactions
-from window import PreviewWindow, preview_size
+from window import PreviewWindow, fill_scale, fit_box, preview_size
 from audio import Artwork, SeekBar, IconButton, ControlSurface, VolumePanel, time_text
 
+
+
+PORTRAIT_FACTOR = 1.15
+# Fixed, not the controls' minimumSizeHint(): that reports 318 px before polish and
+# varies with the time labels, which made visible windows widen unpredictably.
+MIN_VIDEO_WINDOW = QSize(220, 120)
+
+
+def probe_size(path):
+    """Displayed video size via ffprobe (pixel aspect and rotation applied), or None."""
+    try:
+        result = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                                 "stream=width,height,sample_aspect_ratio:stream_side_data=rotation:"
+                                 "stream_tags=rotate", "-of", "json", path],
+                                capture_output=True, text=True, timeout=3)
+        stream = json.loads(result.stdout)["streams"][0]
+        width, height = int(stream["width"]), int(stream["height"])
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, IndexError):
+        return None
+    try:
+        num, den = (int(part) for part in stream.get("sample_aspect_ratio", "1:1").split(":"))
+        if num > 0 and den > 0:
+            width = round(width*num/den)
+    except ValueError:
+        pass
+    rotation = stream.get("tags", {}).get("rotate", 0)
+    for data in stream.get("side_data_list", []):
+        rotation = data.get("rotation", rotation)
+    try:
+        if round(float(rotation)) % 180:
+            width, height = height, width
+    except ValueError:
+        pass
+    return QSize(width, height) if width > 0 and height > 0 else None
 
 class VideoCanvas(Artwork):
     zoomChanged = pyqtSignal()
@@ -216,18 +252,24 @@ class VideoWindow(PreviewWindow):
         super().present(screen, token)
         self.resize_video(screen)
 
+    def fitted_size(self, screen, content):
+        # Vertical videos get a 15% larger box; the width never drops below the controls.
+        portrait = content is not None and content.height() > content.width()
+        box = preview_size(screen, self.size_factor*(PORTRAIT_FACTOR if portrait else 1.0))
+        return fit_box(box, content, MIN_VIDEO_WINDOW)
+
     def resize_video(self, screen):
         if self.isFullScreen():
             self.layout().activate()
             self.update_video_scale()
             return
-        box = preview_size(screen, self.size_factor)
+        # The window keeps the size chosen when shown (from ffprobe, before mapping).
+        box = self.initial_size(screen)
         self.apply_size(box.width(), box.height())
         size = self.video_dimensions
         if size.isEmpty():
             return
-        # Match photo sizing: letterbox inside the fixed preview window.
-        self.canvas.base_scale = min(1.0, box.width()/size.width(), box.height()/size.height())
+        self.canvas.base_scale = fill_scale(box, size)
         if self.canvas.zoom > 1:
             self.resize_for_video_zoom()
 
@@ -309,8 +351,10 @@ class VideoWindow(PreviewWindow):
         self.volume_panel.hide()
         self.setWindowTitle(Path(path).name+" — KDEGlance")
         if not Path(path).is_file():
+            self.content_size = None
             self.player_error(None, "File not found or not accessible")
             return
+        self.content_size = probe_size(path)
         self.player.setSource(QUrl.fromLocalFile(path))
         self.player.play()
 

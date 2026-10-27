@@ -196,6 +196,21 @@ class Canvas(QWidget):
 MIN_IMAGE_WINDOW = QSize(120, 90)  # still fits the rotate/flip buttons
 
 
+def fit_box(box, content, minimum):
+    """The box shrunk to the content's aspect (never enlarged), at least `minimum`."""
+    if content is None or content.isEmpty():
+        return box
+    scale = min(box.width()/content.width(), box.height()/content.height(), 1.0)
+    return QSize(min(box.width(), max(minimum.width(), round(content.width()*scale))),
+                 min(box.height(), max(minimum.height(), round(content.height()*scale))))
+
+
+def fill_scale(box, content):
+    """Fit scale; a sub-1% whole-pixel rounding mismatch fills instead of leaving a thin bar."""
+    low, high = sorted((box.width()/content.width(), box.height()/content.height()))
+    return min(high if high/low < 1.01 else low, 1.0)
+
+
 class PreviewWindow(QWidget):
     size_factor = 1.25  # images and video get a larger window than audio/info panels
     animationError = pyqtSignal(str)
@@ -338,10 +353,7 @@ class PreviewWindow(QWidget):
         # header); rotation or a late decode only rescales inside it.
         # Keep the initial scale independent of subsequent zooming.
         box = self.initial_size(screen)
-        low, high = sorted((box.width()/image.width(), box.height()/image.height()))
-        # Whole-pixel rounding of a fitted window leaves the axes <1% apart; fill it
-        # (clipping at most a pixel) rather than leave a thin bar.
-        self.canvas.base_scale = min(high if high/low < 1.01 else low, 1.0)
+        self.canvas.base_scale = fill_scale(box, image.size())
         self.apply_size(box.width(), box.height())
         if self.windowHandle() and self.windowHandle().screen() != screen:
             self.windowHandle().setScreen(screen)
@@ -357,12 +369,7 @@ class PreviewWindow(QWidget):
 
     def fitted_size(self, screen, content):
         """The preview box shrunk to the content's aspect, so images get no bars."""
-        box = preview_size(screen, self.size_factor)
-        if content is None or content.isEmpty():
-            return box
-        scale = min(box.width()/content.width(), box.height()/content.height(), 1.0)
-        return QSize(min(box.width(), max(MIN_IMAGE_WINDOW.width(), round(content.width()*scale))),
-                     min(box.height(), max(MIN_IMAGE_WINDOW.height(), round(content.height()*scale))))
+        return fit_box(preview_size(screen, self.size_factor), content, MIN_IMAGE_WINDOW)
 
     def initial_size(self, screen):
         # Sized before mapping: KWin centers a window only when it first appears.
