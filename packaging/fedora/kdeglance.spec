@@ -7,7 +7,7 @@
 
 Name:           kdeglance
 Version:        1.0.1
-Release:        11%{?dist}
+Release:        12%{?dist}
 Summary:        Quick Look-style file preview for KDE Plasma and Dolphin
 License:        GPL-3.0-or-later
 URL:            https://github.com/AlexGraveler/KDEGlance
@@ -121,6 +121,9 @@ grep -q '%{_docdir}/%{name}/FEDORA-INSTALL.md' %{buildroot}%{_prefix}/lib/kdegla
 %{_datadir}/kio/servicemenus/kdeglance-space-probe.desktop
 
 %changelog
+* Wed Oct 28 2026 Khalfred <238867466+Khalfred@users.noreply.github.com> - 1.0.1-12
+- Left/Right always change file in document previews; Up/Down turn pages
+
 * Wed Oct 28 2026 Khalfred <238867466+Khalfred@users.noreply.github.com> - 1.0.1-11
 - Remove duplicated viewer code: one Dolphin order for every view and a shared
   audio/video MediaWindow; document previews show order errors like audio/video
