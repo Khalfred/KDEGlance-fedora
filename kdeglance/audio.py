@@ -517,15 +517,6 @@ class AudioWindow(MediaWindow):
             self.stop_audio()
         super().hideEvent(event)
 
-    def keyPressEvent(self, event):
-        # Nothing to scroll or page here, so Up/Down change file like Left/Right.
-        if (event.key() in (Qt.Key.Key_Up, Qt.Key.Key_Down) and not event.isAutoRepeat()
-                and event.modifiers() == Qt.KeyboardModifier.NoModifier):
-            self.navigate_callback(-1 if event.key() == Qt.Key.Key_Up else 1)
-            event.accept()
-        else:
-            super().keyPressEvent(event)
-
     def fit(self):
         pass
 

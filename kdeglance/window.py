@@ -464,8 +464,8 @@ class PreviewWindow(QWidget):
         if event.modifiers() == Qt.KeyboardModifier.NoModifier:
             if event.key() in (Qt.Key.Key_Space, Qt.Key.Key_Escape):
                 self.close_callback()
-            elif event.key() in (Qt.Key.Key_Left, Qt.Key.Key_Right):
-                self.navigate_callback(-1 if event.key() == Qt.Key.Key_Left else 1)
+            elif event.key() in (Qt.Key.Key_Left, Qt.Key.Key_Up, Qt.Key.Key_Right, Qt.Key.Key_Down):
+                self.navigate_callback(-1 if event.key() in (Qt.Key.Key_Left, Qt.Key.Key_Up) else 1)
             elif event.key() in (Qt.Key.Key_0, Qt.Key.Key_F):
                 self.fit()
         event.accept()

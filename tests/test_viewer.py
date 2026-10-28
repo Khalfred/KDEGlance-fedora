@@ -2010,17 +2010,37 @@ class ViewerTests(unittest.TestCase):
             window.hide()
             window.deleteLater()
 
-    def test_58_audio_up_down_change_file(self):
+    def test_58_audio_image_video_up_down_change_file(self):
+        keys = (Qt.Key.Key_Up, Qt.Key.Key_Left, Qt.Key.Key_Down, Qt.Key.Key_Right)
         navigation = []
         window = self.audio_window(navigation.append)
         try:
             window.open_audio(str(ROOT/"examples/audio/preview.wav"))
-            for key in (Qt.Key.Key_Up, Qt.Key.Key_Left, Qt.Key.Key_Down, Qt.Key.Key_Right):
+            for key in keys:
                 QTest.keyClick(window, key)
             self.assertEqual(navigation, [-1, -1, 1, 1])
             self.assertTrue(window.isVisible())
         finally:
             self.audio_cleanup(window)
+        navigation.clear()
+        window = PreviewWindow(lambda: None, navigation.append)
+        try:
+            window.show()
+            for key in keys:
+                QTest.keyClick(window, key)
+            self.assertEqual(navigation, [-1, -1, 1, 1])
+        finally:
+            window.hide()
+            window.deleteLater()
+        navigation.clear()
+        window = self.video_window(navigation.append)
+        try:
+            window.open_video(str(ROOT/"examples/video/preview.mp4"))
+            for key in keys:
+                QTest.keyClick(window, key)
+            self.assertEqual(navigation, [-1, -1, 1, 1])
+        finally:
+            self.video_cleanup(window)
 
 
 if __name__ == "__main__":
