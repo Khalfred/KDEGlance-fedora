@@ -1,7 +1,8 @@
 > [!NOTE]
-> This file describes upstream's Arch/CachyOS test suite. It has not been adapted
-> to or run on Fedora in this port; see [CONTRIBUTING.md](CONTRIBUTING.md) for how
-> changes are tested here.
+> This file describes upstream's Arch/CachyOS release testing. In this port the
+> viewer, GIF, packaging and legacy suites run and pass on Fedora; the installer
+> preflight and AUR checks are Arch-only. See [CONTRIBUTING.md](CONTRIBUTING.md)
+> for how changes are tested here.
 
 # Testing KDEGlance 1.0.1
 
@@ -33,10 +34,10 @@ root and refuses the real account home. Do not run lower-level test files direct
 in a working desktop session. `install.sh --check` only reads requirements/session
 state; it does not install packages or modify integration.
 
-- 55 viewer tests cover image decoding, GIF timing, EXIF/HEIC, corrupt inputs,
+- 59 viewer tests cover image decoding, GIF timing, EXIF/HEIC, corrupt inputs,
   zoom/pan, transforms, audio metadata/playback/seek/volume, video frames/rotation,
-  module switching, bounded caches, D-Bus lifecycle and mocked Dolphin order/current
-  item synchronization. Two historical installer assertions were updated to the
+  document previews and arrow-key navigation, module switching, bounded caches,
+  D-Bus lifecycle and mocked Dolphin order/current item synchronization. Two historical installer assertions were updated to the
   release policy of refusing unowned service-menu files; backup restoration is
   tested with a pre-existing custom Dolphin launcher instead.
 - 5 GIF tests cover streaming beyond the old frame limit, finite loops, delays,

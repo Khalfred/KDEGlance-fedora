@@ -1,5 +1,24 @@
 # Changelog
 
+## Fedora port 1.0.1-18 — 2026-10-28
+
+Unofficial Fedora KDE port; per-package details are in the `%changelog` of
+`packaging/fedora/kdeglance.spec`.
+
+- Fedora RPM packaging; English messages throughout.
+- Previews for PDF and office documents (page-thumbnail sidebar), text, code
+  (syntax highlighted like Kate), JSON, Markdown, archive listings, and an
+  information panel for folders, executables and any other file.
+- Centered windows sized from Dolphin's saved window size and fitted to each
+  image and video; vertical videos get a larger window; zoom stays inside it.
+- Arrow keys: Left/Right always change file. Up/Down turn PDF/office pages
+  (changing file past either end), scroll long text three lines, and change
+  file everywhere else.
+- Navigation works when two Dolphin windows show the same folder; Dolphin's
+  selection is then left unchanged.
+- Shared audio/video player code and a single Dolphin order in the daemon.
+- Test suite runs on Fedora: 59 viewer, 5 GIF, 12 packaging and 6 legacy tests.
+
 ## [1.0.1] — 2026-10-24
 
 - Diagnose PATH shadowing by the retired /usr/local/bin/kdeglance launcher; preserve CLI argument forwarding and allow --version during migration.

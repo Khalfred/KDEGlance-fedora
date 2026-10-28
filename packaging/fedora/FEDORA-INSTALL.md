@@ -9,10 +9,14 @@ problems with this port here, not upstream.
 ```bash
 sudo dnf install rpm-build rpmdevtools gcc-c++ qt6-qtbase-devel \
     kf6-kwindowsystem-devel desktop-file-utils python3
-bash packaging/fedora/build.sh
-sudo dnf install ~/rpmbuild/RPMS/x86_64/kdeglance-1.0.1-*.x86_64.rpm
+bash packaging/fedora/build.sh   # lists the built RPMs; the highest release is the new one
+sudo dnf install ~/rpmbuild/RPMS/x86_64/kdeglance-<version>-<release>.x86_64.rpm
 systemctl --user restart kdeglance2.service   # when upgrading
 ```
+
+Install the exact new file: older builds stay in `~/rpmbuild/RPMS`, and a `*`
+pattern would match them too. On Fedora 44 the RPM can instead be downloaded from
+the [latest release](https://github.com/Khalfred/KDEGlance-fedora/releases/latest).
 
 dnf pulls in the runtime dependencies (PyQt6, Qt Multimedia, KIO Fuse, ...).
 Installing the package does not touch HOME, keyboard shortcuts or running services.
@@ -29,7 +33,9 @@ kbuildsycoca6 --noincremental
 
 `--enable-dolphin` backs up and writes only `~/.local/share/applications/org.kde.dolphin.desktop`
 to turn on Qt accessibility (needed for selection/order sync). Fully quit Dolphin
-and reopen it.
+and reopen it. If two Dolphin windows show the same folder with the same file
+selected, arrow keys still follow the folder's order, but Dolphin's selection is
+not moved, since the window the preview came from cannot be told apart.
 
 Then in Dolphin: **Settings → Configure Keyboard Shortcuts → KDEGlance: Quick Look**
 and assign **Space** (review any conflict yourself). D-Bus starts

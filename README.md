@@ -231,6 +231,8 @@ source with its license notices.
 - Dolphin order/keyboard selection needs its accessibility-enabled launcher and
   an identifiable source folder. If communication fails, synchronization and
   media navigation may be unavailable. No polling of arbitrary selection occurs.
+  When two Dolphin windows show the same folder with the same file selected,
+  arrow keys follow their shared order but Dolphin's selection is left unchanged.
 - SMB is handled by KIO Fuse. This is not universal KIO/AFC support and has not
   been validated with a physical iPhone. A slow Fuse request may delay opening.
 - Wayland placement and screen constraints are managed by KWin, which centers a

@@ -43,8 +43,8 @@ only take effect from the installed package, followed by
 ## Building the package
 
 ```bash
-bash packaging/fedora/build.sh
-sudo dnf install ~/rpmbuild/RPMS/x86_64/kdeglance-1.0.1-*.x86_64.rpm
+bash packaging/fedora/build.sh   # lists the built RPMs; install the highest release
+sudo dnf install ~/rpmbuild/RPMS/x86_64/kdeglance-<version>-<release>.x86_64.rpm
 systemctl --user restart kdeglance2.service
 ```
 
@@ -62,8 +62,26 @@ identities need a migration plan if changed: users may have saved Space bindings
 User-visible messages are in English.
 
 Report native Wayland/Dolphin/manual checks separately from offscreen tests.
-The upstream test suite (TESTING.md) targets Arch/CachyOS and has not been
-adapted to or run on Fedora; do not claim it passes here without a real run.
+
+## Running the tests
+
+The suites run offscreen on a private D-Bus session with a disposable HOME under
+`.work/`. They need generated test media first; H.264 encoding needs the full
+FFmpeg from RPM Fusion (see FEDORA-INSTALL.md, "Codecs"):
+
+```bash
+sudo dnf install python3-pillow libheif-tools
+python3 -B tests/generate_fixtures.py   # writes the git-ignored kdeglance/examples/
+python3 -B tests/run_tests.py           # 59 viewer tests
+python3 -B tests/run_tests.py --gif     # 5 GIF tests
+python3 -B tests/run_packaging.py       # 12 packaging tests
+python3 -B tests/test_legacy.py         # 6 migration tests
+```
+
+All of these pass on Ultramarine 44 (Fedora 44 KDE base). `tests/test_preflight.py`
+and `tests/test_aur.py` check upstream's Arch installer and package and fail on
+Fedora by design. Add a test for each behaviour change; a test that should fail
+before the change shows it really checks the change.
 
 Use original or explicitly licensed fixtures. Never commit personal media,
 credentials, logs, absolute developer-home paths, generated .so files, or .work/.

@@ -7,10 +7,12 @@ photographs, music recordings or downloaded video samples are included.
 The generator and the generated media are distributed with KDEGlance under
 GPL-3.0-or-later. Embedded covers use the same original geometric artwork.
 Broken files are deliberate test inputs. The HEIC examples are synthetic color
-blocks, not camera photographs. The 55 viewer tests also generate their own
+blocks, not camera photographs. The 59 viewer tests also generate their own
 PNG/JPEG/GIF/EXIF inputs in a disposable directory.
 
 Regeneration requires the optional development packages `python-pillow`, `ffmpeg`
 and `libheif` (the `heif-enc` program), in addition to normal build dependencies.
+On Fedora these are `python3-pillow`, `libheif-tools` and the full `ffmpeg` from
+RPM Fusion (`ffmpeg-free` cannot encode the H.264 fixtures).
 Encoding output may vary between codec versions; no bit-identical media output
 is promised. The checked archive checksum identifies the distributed fixtures.
