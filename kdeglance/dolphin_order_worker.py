@@ -68,6 +68,23 @@ def execute(request):
         window_call(candidates[0], "openFiles", GLib.Variant("(asb)", ([url], False)))
 
     current = Path(request["path"]).absolute()
+
+    def listing(view):
+        entries = children(view)
+        if len(entries) > 20000:
+            raise RuntimeError("Too many items in the Dolphin folder for one preview")
+        ordered = []
+        indices = {}
+        for index, child in enumerate(entries):
+            filename = name(child)
+            if (filename and Path(filename).name == filename
+                    and Path(filename).suffix.lower() in extensions):
+                file = current.parent/filename
+                if file.is_file() or (extensions is ALL_FILES and file.is_dir()):
+                    ordered.append(str(file))
+                    indices[str(file)] = index
+        return entries, ordered, indices
+
     source_directory = folder_url(current)
     context = request.get("context")
     if context is None:
@@ -93,9 +110,12 @@ def execute(request):
                     continue
                 if depth < 13:
                     queue.extend((child, depth+1) for child in children(ref)[:60])
-        if len(candidates) != 1:
+        # Several windows can show this folder with the file selected; which one
+        # opened the preview is unknown. Their shared order is still usable, but
+        # the selection is then left alone ("shared").
+        if not candidates or len({tuple(listing(c["view"])[1]) for c in candidates}) != 1:
             raise RuntimeError("Could not reliably read the order of the open Dolphin folder. Reopen Dolphin from its launcher.")
-        context = candidates[0]
+        context = {**candidates[0], "shared": len(candidates) > 1}
     if name(context["application"]).lower() != "dolphin" or context["directory"] != str(current.parent):
         raise RuntimeError("The source Dolphin folder changed")
     view = context["view"]
@@ -104,22 +124,11 @@ def execute(request):
     if not any(description.endswith(u) for u in
                tuple(part+tail for part in (url.toDisplayString(),url.toString(QUrl.ComponentFormattingOption.FullyEncoded)) for tail in ("","/"))):
         raise RuntimeError("The source Dolphin folder has already changed")
-    entries = children(view)
-    if len(entries) > 20000:
-        raise RuntimeError("Too many items in the Dolphin folder for one preview")
-    ordered = []
-    indices = {}
-    for index, child in enumerate(entries):
-        filename = name(child)
-        if (filename and Path(filename).name == filename
-                and Path(filename).suffix.lower() in extensions):
-            file = current.parent/filename
-            if file.is_file() or (extensions is ALL_FILES and file.is_dir()):
-                ordered.append(str(file))
-                indices[str(file)] = index
+    entries, ordered, indices = listing(view)
     if str(current) not in indices:
         raise RuntimeError("The current file is no longer shown in the source Dolphin folder")
-    if request.get("operation") == "select":
+    sync = request.get("operation") == "select" and not context.get("shared")
+    if sync:
         # Do not replace a different, deliberate selection made by the user.
         allowed = {Path(p).name for p in request.get("allowed", [str(current)])}
         before = selected(view)
@@ -132,7 +141,7 @@ def execute(request):
     # AT-SPI FOCUSED (12) is Dolphin's current item, independent of selection.
     state = call(entries[indices[str(current)]], accessible, "GetState")[0]
     result["current_item_matches"] = bool(state[0] & (1 << 12))
-    if request.get("operation") == "select" and not result["current_item_matches"]:
+    if sync and not result["current_item_matches"]:
         raise RuntimeError("Dolphin did not confirm the current keyboard item")
     return result
 

@@ -2065,6 +2065,91 @@ class ViewerTests(unittest.TestCase):
         finally:
             self.video_cleanup(window)
 
+    def test_59_dolphin_order_with_two_windows_on_the_same_folder(self):
+        import types
+        from unittest.mock import patch
+        from PyQt6.QtCore import QUrl
+        import dolphin_order_worker
+        folder = self.home/"two-windows"
+        folder.mkdir()
+        names = ["a.json", "b.pdf", "c.txt"]
+        for name in names:
+            (folder/name).write_text("x")
+        paths = [str(folder/name) for name in names]
+        url = QUrl.fromLocalFile(str(folder)).toDisplayString()
+
+        class Reply:
+            def __init__(self, *values):
+                self.values = values
+
+            def unpack(self):
+                return self.values
+
+        # A fake AT-SPI tree: one Dolphin with two windows showing the same folder,
+        # the same file selected in both.
+        tree = {("reg", "/root"): {"children": [(":1", "/app")]},
+                (":1", "/app"): {"role": "application", "Name": "dolphin", "children": []}}
+
+        def add_window(index, order):
+            frame, view = (":1", f"/frame{index}"), (":1", f"/view{index}")
+            items = [(":1", f"/view{index}/{name}") for name in order]
+            tree[(":1", "/app")]["children"].append(frame)
+            tree[frame] = {"role": "frame", "children": [view]}
+            tree[view] = {"role": "list", "Description": "in location " + url, "children": items,
+                          "NSelectedChildren": 1, "selected": items[order.index("a.json")]}
+            for item, name in zip(items, order):
+                tree[item] = {"role": "list item", "Name": name, "state": 1 << 12 if name == "a.json" else 0}
+
+        def bus_call(destination, path, interface, method, args, *_):
+            node = tree[(destination, path)]
+            if method == "GetChildren":
+                return Reply(node["children"])
+            if method == "GetRoleName":
+                return Reply(node["role"])
+            if method == "GetState":
+                return Reply([node.get("state", 0), 0])
+            if method == "GetSelectedChild":
+                return Reply(node["selected"])
+            if method == "Get":
+                return Reply(node[args[1]])
+            raise AssertionError(method)
+
+        def session_call(destination, path, interface, method, *_):
+            # Only the accessibility bus address; never a Dolphin window call.
+            self.assertEqual(method, "GetAddress")
+            return Reply("fake-address")
+
+        flags = types.SimpleNamespace(NONE=0, SESSION=0, AUTHENTICATION_CLIENT=0, MESSAGE_BUS_CONNECTION=0)
+        bus = types.SimpleNamespace(call_sync=bus_call)
+        session = types.SimpleNamespace(call_sync=session_call)
+        Gio = types.SimpleNamespace(DBusCallFlags=flags, BusType=flags, DBusConnectionFlags=flags,
+                                    bus_get_sync=lambda *_: session,
+                                    DBusConnection=types.SimpleNamespace(new_for_address_sync=lambda *_: bus))
+        GLib = types.SimpleNamespace(Variant=lambda signature, value: value)
+        repository = types.ModuleType("gi.repository")
+        repository.Gio, repository.GLib = Gio, GLib
+        gi = types.ModuleType("gi")
+        gi.require_version, gi.repository = (lambda *_: None), repository
+        with patch.dict(sys.modules, {"gi": gi, "gi.repository": repository}):
+            tree[("org.a11y.atspi.Registry", "/org/a11y/atspi/accessible/root")] = tree[("reg", "/root")]
+            add_window(1, names)
+            add_window(2, names)
+            snapshot = dolphin_order_worker.execute({"operation": "snapshot", "path": paths[0],
+                                                     "context": None, "media": "all"})
+            self.assertEqual(snapshot["paths"], paths)
+            # Moving on leaves both windows' selection alone instead of failing.
+            context = json.loads(json.dumps(snapshot["context"]))
+            moved = dolphin_order_worker.execute({"operation": "select", "path": paths[1], "context": context,
+                                                  "media": "all", "allowed": paths[:2]})
+            self.assertEqual((moved["paths"], moved["selected"]), (paths, paths[1]))
+            # Windows that list the folder in different orders are still ambiguous.
+            tree[(":1", "/app")]["children"].clear()
+            add_window(1, names)
+            add_window(2, list(reversed(names)))
+            with self.assertRaisesRegex(RuntimeError, "Could not reliably read the order"):
+                dolphin_order_worker.execute({"operation": "snapshot", "path": paths[0],
+                                              "context": None, "media": "all"})
+
 
 if __name__ == "__main__":
     import faulthandler
