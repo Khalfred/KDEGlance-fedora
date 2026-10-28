@@ -7,7 +7,7 @@
 
 Name:           kdeglance
 Version:        1.0.1
-Release:        12%{?dist}
+Release:        13%{?dist}
 Summary:        Quick Look-style file preview for KDE Plasma and Dolphin
 License:        GPL-3.0-or-later
 URL:            https://github.com/AlexGraveler/KDEGlance
@@ -121,6 +121,9 @@ grep -q '%{_docdir}/%{name}/FEDORA-INSTALL.md' %{buildroot}%{_prefix}/lib/kdegla
 %{_datadir}/kio/servicemenus/kdeglance-space-probe.desktop
 
 %changelog
+* Wed Oct 28 2026 Khalfred <238867466+Khalfred@users.noreply.github.com> - 1.0.1-13
+- Up/Down change file in information panels and scroll three lines in text
+
 * Wed Oct 28 2026 Khalfred <238867466+Khalfred@users.noreply.github.com> - 1.0.1-12
 - Left/Right always change file in document previews; Up/Down turn pages
 
