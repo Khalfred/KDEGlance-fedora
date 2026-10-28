@@ -84,22 +84,6 @@ the project's own files and system files were used; see
 | --- | --- |
 | ![Fitted image preview](screenshots/port-image.png) | ![Vertical video preview](screenshots/port-video.png) |
 
-### Upstream 1.0.1
-
-These are captures of the real Qt widgets and media player, using the original
-synthetic media kept in the repository with the tests. They were captured offscreen, not drawn
-as interface mockups; native compositor effects/placement are not demonstrated.
-
-| Image preview | Image controls and zoom |
-| --- | --- |
-| ![Image preview](screenshots/image-preview.png) | ![Image controls](screenshots/image-controls.png) |
-
-| Embedded audio cover | No embedded cover |
-| --- | --- |
-| ![Audio with cover](screenshots/audio-cover.png) | ![Audio placeholder](screenshots/audio-placeholder.png) |
-
-![Video preview](screenshots/video-preview.png)
-
 ## Installation
 
 On Fedora KDE, in a normal Plasma Wayland user session.
