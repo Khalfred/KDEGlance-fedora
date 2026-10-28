@@ -102,23 +102,47 @@ as interface mockups; native compositor effects/placement are not demonstrated.
 
 ## Installation
 
-On Fedora KDE, in a normal Plasma Wayland user session:
+On Fedora KDE, in a normal Plasma Wayland user session.
+
+### 1. Install the dependencies
+
+```bash
+sudo dnf install python3 python3-pyqt6 python3-gobject python3-mutagen \
+    qt6-qtbase qt6-qtpdf qt6-qtmultimedia qt6-qtwayland qt6-qtimageformats qt6-qtsvg \
+    kf6-kimageformats kf6-kwindowsystem kf6-kservice kf6-syntax-highlighting \
+    dolphin kio-fuse kio-extras at-spi2-core glib2 dbus systemd plasma-workspace \
+    libreoffice-core libreoffice-writer /usr/bin/ffprobe 7zip
+```
+
+The last line is optional: office documents, video sizing and 7z archives.
+
+### 2. Install KDEGlance
+
+On **Fedora 44**, download the RPM from the
+[latest release](https://github.com/Khalfred/KDEGlance-fedora/releases/latest) and
+install it:
+
+```bash
+curl -LO https://github.com/Khalfred/KDEGlance-fedora/releases/download/v1.0.1-18/kdeglance-1.0.1-18.fc44.x86_64.rpm
+sudo dnf install ./kdeglance-1.0.1-18.fc44.x86_64.rpm
+```
+
+On **other Fedora releases**, build the RPM from source instead:
 
 ```bash
 sudo dnf install rpm-build rpmdevtools gcc-c++ qt6-qtbase-devel \
-    kf6-kwindowsystem-devel desktop-file-utils python3 git
+    kf6-kwindowsystem-devel desktop-file-utils git
 git clone https://github.com/Khalfred/KDEGlance-fedora.git
 cd KDEGlance-fedora
-bash packaging/fedora/build.sh
-sudo dnf install ~/rpmbuild/RPMS/x86_64/kdeglance-1.0.1-*.x86_64.rpm
+bash packaging/fedora/build.sh   # lists the built RPMs
+sudo dnf install ~/rpmbuild/RPMS/x86_64/kdeglance-<version>-<release>.x86_64.rpm
 ```
 
-On Fedora 44 you can skip the build: download the RPM from the
-[latest release](https://github.com/Khalfred/KDEGlance-fedora/releases/latest) and
-run `sudo dnf install ./kdeglance-*.x86_64.rpm`.
+Installing the package does not change HOME, keyboard shortcuts or running services.
 
-`dnf` installs the runtime dependencies. Installing the package does not change
-HOME, keyboard shortcuts or running services. Then, as your normal user:
+### 3. Set up Dolphin
+
+As your normal user, not sudo:
 
 ```bash
 kdeglance-setup --enable-dolphin
@@ -129,8 +153,12 @@ Fully quit and reopen Dolphin. See
 [FEDORA-INSTALL.md](packaging/fedora/FEDORA-INSTALL.md) for updates, codecs,
 settings, migrating from a manual install, and removal.
 
-To update a source install, pull and rebuild, then install the exact new file
-(older builds stay in `~/rpmbuild/RPMS`, so a `*` pattern would match them too):
+### Updating
+
+Install a newer release RPM the same way, then run
+`systemctl --user restart kdeglance2.service`. To update a source install, pull
+and rebuild, then install the exact new file (older builds stay in
+`~/rpmbuild/RPMS`, so a `*` pattern would match them too):
 
 ```bash
 cd KDEGlance-fedora

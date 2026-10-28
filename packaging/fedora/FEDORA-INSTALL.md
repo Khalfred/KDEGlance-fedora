@@ -18,7 +18,9 @@ Install the exact new file: older builds stay in `~/rpmbuild/RPMS`, and a `*`
 pattern would match them too. On Fedora 44 the RPM can instead be downloaded from
 the [latest release](https://github.com/Khalfred/KDEGlance-fedora/releases/latest).
 
-dnf pulls in the runtime dependencies (PyQt6, Qt Multimedia, KIO Fuse, ...).
+dnf pulls in the runtime dependencies (PyQt6, Qt Multimedia, KIO Fuse, ...). To
+install them as a separate step first, use the `dnf install` command in the
+README's [Installation](../../README.md#1-install-the-dependencies) section.
 Installing the package does not touch HOME, keyboard shortcuts or running services.
 
 ## First launch and Dolphin setup (as your normal user, not sudo)
