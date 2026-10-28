@@ -143,12 +143,20 @@ class ViewerTests(unittest.TestCase):
         self.assertEqual(state["window_count"], 1)
 
     def test_05_failures_not_substituted(self):
-        for path in (self.bad, self.text, self.fixtures/"missing.png", self.fixtures):
+        for path in (self.bad, self.fixtures/"missing.png"):
             self.request("Open", path)
             state = self.ready()
             self.assertEqual(state["phase"], "error")
             self.assertEqual(state["path"], str(path))
             self.assertEqual(state["frame_count"], 0)
+        # Text files and folders are previewed as documents, not reported as image errors.
+        for path, kinds in ((self.text, ("text", "code")), (self.fixtures, ("folder",))):
+            self.request("Open", path)
+            state = self.ready()
+            self.assertEqual(state["module"], "document")
+            self.assertEqual(state["path"], str(path))
+            self.assertEqual(state["phase"], "ready")
+            self.assertIn(state["document"]["kind"], kinds)
         self.assertFalse(call("Open", {"paths": ["smb://server/file.png"]})["ok"])
 
     def test_06_animation_and_orientation(self):
@@ -387,6 +395,9 @@ class ViewerTests(unittest.TestCase):
 
     def test_15_minimal_window_geometry_and_pixels(self):
         class Screen:
+            def geometry(self):
+                return QRect(0, 0, 1000, 700)
+
             def availableGeometry(self):
                 return QRect(0, 0, 1000, 700)
 
@@ -406,17 +417,22 @@ class ViewerTests(unittest.TestCase):
             self.assertTrue(window.mask().isEmpty())
             # Before creating a native handle, exercise fitting against a
             # deterministic available area, including very small images.
+            # No saved Dolphin size: 60% of 1000x700, x0.5 default scale, x1.25 for images.
+            box_w, box_h = 375, 262
             for width, height in ((640, 320), (320, 640), (4000, 2000),
                                   (2000, 4000), (101, 73), (1, 1)):
                 image = QImage(width, height, QImage.Format.Format_RGB32)
+                window.content_size = image.size()  # The daemon reads it from the file header.
                 window.resize_to_image(image, Screen())
-                self.assertLessEqual(window.width(), 968)
-                self.assertLessEqual(window.height(), 668)
-                scale = min(968/width, 668/height, 1.0)
-                self.assertEqual(window.width(), max(1, int(width*scale)))
-                self.assertEqual(window.height(), max(1, int(height*scale)))
+                self.assertLessEqual(window.width(), box_w)
+                self.assertLessEqual(window.height(), box_h)
+                # Shrunk to the image's shape (no bars), never enlarged, at least 120x90 for the controls.
+                scale = min(box_w/width, box_h/height, 1.0)
+                self.assertEqual(window.width(), max(120, round(width*scale)))
+                self.assertEqual(window.height(), max(90, round(height*scale)))
             image = QImage(240, 120, QImage.Format.Format_RGB32)
             image.fill(QColor("#e32040"))
+            window.content_size = image.size()
             window.resize_to_image(image, Screen())
             window.set_frames([(image, 100)], -1)
             window.show()
@@ -560,14 +576,13 @@ class ViewerTests(unittest.TestCase):
             controller.window.deleteLater()
             controller.deleteLater()
 
-    def test_19_zoom_grows_window_until_available_bounds(self):
+    def test_19_zoom_stays_inside_the_fixed_window(self):
+        # Zoom never resizes the window: a resize would undo KWin's centering.
         window = PreviewWindow(lambda: None, lambda _: None)
         try:
             window.show()
             app.processEvents()
             canvas = window.canvas
-            available = window.screen().availableGeometry()
-            max_w, max_h = available.width()-32, available.height()-32
 
             def wheel(delta):
                 mouse = QPointF(canvas.rect().center())
@@ -577,37 +592,35 @@ class ViewerTests(unittest.TestCase):
                 app.sendEvent(canvas, event)
                 app.processEvents()
 
-            # Small portrait: both dimensions grow, then shrink on zoom-out.
-            image = QImage(120, 240, QImage.Format.Format_RGB32)
-            window.set_frames([(image, 100)], -1)
-            window.resize_to_image(image, window.screen())
+            def show_image(width, height):
+                image = QImage(width, height, QImage.Format.Format_RGB32)
+                window.content_size = image.size()
+                window.set_frames([(image, 100)], -1)
+                window.resize_to_image(image, window.screen())
+                return window.size()
+
+            # Small portrait: zoom in and out inside an unchanged window.
+            size = show_image(120, 240)
             wheel(120)
             self.assertAlmostEqual(canvas.zoom, 1.15)
-            self.assertEqual(window.width(), min(138, max_w))
-            self.assertEqual(window.height(), min(276, max_h))
+            self.assertEqual(window.size(), size)
             wheel(-120)
             self.assertAlmostEqual(canvas.zoom, 1)
-            self.assertLessEqual(abs(window.width()-120), 1)
-            self.assertLessEqual(abs(window.height()-240), 1)
+            self.assertEqual(window.size(), size)
 
-            # Initially downscaled portrait: growing the viewport must not
-            # recompute fit_scale and amplify the requested zoom.
-            image = QImage(1200, 2400, QImage.Format.Format_RGB32)
-            window.set_frames([(image, 100)], -1)
-            window.resize_to_image(image, window.screen())
+            # Initially downscaled portrait: zooming must not recompute
+            # fit_scale and amplify the requested zoom.
+            size = show_image(1200, 2400)
             base = canvas.fit_scale()
             wheel(120)
             self.assertEqual(canvas.fit_scale(), base)
             self.assertAlmostEqual(canvas.image_rect().height(), 2400*base*1.15)
-            self.assertEqual(window.width(), min(int(1200*base*1.15), max_w))
-            self.assertEqual(window.height(), min(int(2400*base*1.15), max_h))
             for _ in range(30):
                 wheel(120)
-            self.assertEqual(window.width(), max_w)
-            self.assertEqual(window.height(), max_h)
+            self.assertEqual(window.size(), size)
             self.assertEqual(canvas.zoom, 32)
             self.assertGreater(canvas.image_rect().height(), canvas.height())
-            # Once bounded, wheel zoom keeps the cursor anchor in the crop.
+            # Wheel zoom keeps the cursor anchor in the crop.
             mouse = QPointF(canvas.rect().center())
             old = canvas.image_rect()
             fraction = (mouse.y()-old.top())/old.height()
@@ -616,8 +629,7 @@ class ViewerTests(unittest.TestCase):
             self.assertAlmostEqual((mouse.y()-new.top())/new.height(), fraction)
             QTest.keyClick(window, Qt.Key.Key_F)
             self.assertEqual(canvas.zoom, 1)
-            self.assertEqual(window.width(), max(1, int(1200*base)))
-            self.assertEqual(window.height(), max(1, int(2400*base)))
+            self.assertEqual(window.size(), size)
             self.assertEqual(canvas.pan, QPointF())
         finally:
             window.hide()
@@ -1172,9 +1184,11 @@ class ViewerTests(unittest.TestCase):
     def test_38_compact_layout_and_transient_vertical_volume(self):
         window = self.audio_window()
         try:
+            # No saved Dolphin size: 60% of the screen x0.5 default scale, at least 320x220.
             area = app.primaryScreen().availableGeometry()
-            edge = min(760, area.width()-32, area.height()-32)
-            self.assertEqual((window.width(), window.height()), (edge, edge))
+            expected = (min(max(320, int(area.width()*0.3)), area.width()-32),
+                        min(max(220, int(area.height()*0.3)), area.height()-32))
+            self.assertEqual((window.width(), window.height()), expected)
             self.assertFalse(window.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
             self.assertTrue(window.windowFlags() & Qt.WindowType.FramelessWindowHint)
             self.assertEqual(window.volume_slider.orientation(), Qt.Orientation.Vertical)
@@ -1489,9 +1503,15 @@ class ViewerTests(unittest.TestCase):
                 with self.subTest(name=name):
                     window.open_video(str(ROOT/"examples/video"/name))
                     self.audio_wait(lambda: window.frames_received > 2, timeout=5000)
+                    # No saved Dolphin size: 60% of the screen x0.5 default scale, x1.25 for video,
+                    # x1.15 more for vertical video; then shrunk to the video's shape, at least 220x120.
                     area = window.screen().availableGeometry()
-                    scale = min(1, (area.width()-32)/dimensions[0], (area.height()-32)/dimensions[1])
-                    expected = (int(dimensions[0]*scale), int(dimensions[1]*scale))
+                    factor = 0.5*1.25*(1.15 if dimensions[1] > dimensions[0] else 1)
+                    box_w = min(max(320, int(area.width()*0.6*factor)), area.width()-32)
+                    box_h = min(max(220, int(area.height()*0.6*factor)), area.height()-32)
+                    scale = min(box_w/dimensions[0], box_h/dimensions[1], 1)
+                    expected = (min(box_w, max(220, round(dimensions[0]*scale))),
+                                min(box_h, max(120, round(dimensions[1]*scale))))
                     self.assertEqual(window.snapshot()["display_size"], list(dimensions))
                     self.assertEqual((window.width(), window.height()), expected)
                     self.assertEqual(window.size(), window.windowHandle().size())
@@ -1565,13 +1585,14 @@ class ViewerTests(unittest.TestCase):
             self.assertEqual(window.canvas.zoom,1)
             for _ in range(3): window.rotate_button.click()
             self.assertEqual(window.snapshot()["display_size"],[640,360])
+            normal = window.size()
             window.fullscreen_button.click()
             self.assertTrue(window.isFullScreen())
             self.assertIsNone(window.target_size)
             QTest.keyClick(window,Qt.Key.Key_Escape)
             self.assertFalse(window.isFullScreen())
             self.assertTrue(window.isVisible())
-            self.assertEqual((window.width(),window.height()),(640,360))
+            self.assertEqual(window.size(),normal)  # Back to the fitted, centered size.
         finally:
             self.video_cleanup(window)
 
@@ -1741,7 +1762,9 @@ class ViewerTests(unittest.TestCase):
         self.request("Open", raw)
         state = self.ready()
         self.assertTrue(state["error"])
-        self.assertNotIn("Unsupported image format", state["error"])
+        # Reaches the decoder: not the loader's own rejection of unknown extensions
+        # (Qt's decoder error may contain the same words).
+        self.assertNotEqual(state["error"], "Unsupported image format")
         self.request("Open", photo)
         self.assertEqual(self.ready()["phase"], "ready")
 
