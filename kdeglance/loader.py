@@ -101,6 +101,9 @@ class LoadJob(QRunnable):
             result = {"error": str(error), "frames": [], "playlist": [self.path]}
         self.signals.done.emit(self.generation, result)
 
+    def playlist(self):
+        return self.selected if len(self.selected) > 1 else neighbours(self.path, self.cancelled, ALL_FILES if self.mixed else EXTENSIONS)
+
     def decode(self):
         path = Path(self.path)
         if self.cancelled.is_set():
@@ -109,14 +112,13 @@ class LoadJob(QRunnable):
             raise ValueError("File not found or not accessible")
         if path.suffix.lower() not in EXTENSIONS:
             raise ValueError("Unsupported image format")
-        is_cr2 = path.suffix.lower() in RAW_EXTENSIONS
+        is_raw = path.suffix.lower() in RAW_EXTENSIONS
         if path.suffix.lower()[1:].encode() not in [bytes(f) for f in QImageReader.supportedImageFormats()]:
             raise ValueError("This format needs a Qt image decoder (kimageformats, qt6-qtimageformats, qt6-qtsvg)")
         signature = self.cache.signature(path) if self.cache else None
         cached = self.cache.get(self.path, signature) if self.cache else None
         if cached is not None:
-            playlist = self.selected if len(self.selected) > 1 else neighbours(self.path, self.cancelled, ALL_FILES if self.mixed else EXTENSIONS)
-            return {**cached, "error": "", "playlist": playlist,
+            return {**cached, "error": "", "playlist": self.playlist(),
                     "cache_hit": True, "cancelled": self.cancelled.is_set()}
         reader = QImageReader(str(path))
         reader.setAutoTransform(True)
@@ -129,7 +131,7 @@ class LoadJob(QRunnable):
         # callbacks. Decode HEIF through read() first and bound it afterwards.
         # RAW size() reparses the camera file and its handler ignores ScaledSize.
         # Read once in the worker, then bound the resulting image as for HEIF.
-        if not (is_heif or is_cr2):
+        if not (is_heif or is_raw):
             size = reader.size()
             if size.isValid() and max(size.width(), size.height()) > MAX_EDGE:
                 reader.setScaledSize(size.scaled(QSize(MAX_EDGE, MAX_EDGE), Qt.AspectRatioMode.KeepAspectRatio))
@@ -141,7 +143,7 @@ class LoadJob(QRunnable):
             image = reader.read()
             if image.isNull():
                 raise ValueError("Could not read image: " + reader.errorString())
-            if (is_heif or is_cr2 or animated) and max(image.width(), image.height()) > MAX_EDGE:
+            if (is_heif or is_raw or animated) and max(image.width(), image.height()) > MAX_EDGE:
                 image = image.scaled(MAX_EDGE, MAX_EDGE, Qt.AspectRatioMode.KeepAspectRatio,
                                      Qt.TransformationMode.SmoothTransformation)
             # Treat image dimensions as physical pixels, including @2x filenames.
@@ -160,12 +162,10 @@ class LoadJob(QRunnable):
                 break
         if self.cancelled.is_set():
             return {"cancelled": True}
-        playlist = self.selected if len(self.selected) > 1 else neighbours(self.path, self.cancelled, ALL_FILES if self.mixed else EXTENSIONS)
-        result = {"frames": frames, "loops": reader.loopCount(), "playlist": playlist,
+        result = {"frames": frames, "loops": reader.loopCount(), "playlist": self.playlist(),
                   "error": "", "decoded_size": [frames[0][0].width(), frames[0][0].height()],
                   "cache_hit": False}
         if streaming:
-            result['frames'] = frames[:1]
             result['animation_path'] = str(path)
             result['animation_frame_count'] = animation_count
         if (self.cache and not self.cancelled.is_set()

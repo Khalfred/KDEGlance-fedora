@@ -8,7 +8,7 @@ import sys
 import uuid
 from PyQt6.QtCore import QCoreApplication
 from PyQt6.QtDBus import QDBusConnection, QDBusMessage, QDBus
-from core import BUS, OBJECT, INTERFACE, local_path, VERSION
+from core import BUS, OBJECT, INTERFACE, VERSION
 from remote import resolve_input
 
 

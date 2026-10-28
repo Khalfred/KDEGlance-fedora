@@ -1277,7 +1277,7 @@ class ViewerTests(unittest.TestCase):
         try:
             controller.request(json.dumps({"paths": [str(self.first), str(self.second), str(self.gif)]}), False)
             ready()
-            controller.image_selection = Selection(str(self.first))
+            controller.order = Selection(str(self.first))
             controller.window.present = lambda *_: self.fail("Navigation must not reactivate the viewer")
             QTest.keyClick(controller.window, Qt.Key.Key_Right)
             ready()
@@ -1293,7 +1293,7 @@ class ViewerTests(unittest.TestCase):
             QTest.keyClick(controller.window, Qt.Key.Key_Space)
             self.assertFalse(controller.window.isVisible())
             self.assertEqual(finished, [str(self.second)])
-            self.assertIsNone(controller.image_selection)
+            self.assertIsNone(controller.order)
             controller.pool.waitForDone(5000)
             app.processEvents()
             self.assertEqual(selected[-1], str(self.second))
@@ -1648,12 +1648,12 @@ class ViewerTests(unittest.TestCase):
             controller.request(json.dumps({"paths":[str(first)]}),False)
             self.audio_wait(lambda:controller.phase=="ready")
             order=Order()
-            controller.image_selection=order
+            controller.order=order
             for target,mode in ((second,"audio"),(third,"video"),(fourth,"image")):
                 controller.navigate(1)
                 self.assertEqual(controller.mode,mode)
                 self.assertEqual(controller.path,str(target))
-                self.assertIs(controller.active_order(),order)
+                self.assertIs(controller.order,order)
                 if mode=="image":self.audio_wait(lambda:controller.phase=="ready")
                 if controller.audio:controller.audio.output.setVolume(0)
                 if controller.video:controller.video.output.setVolume(0)
@@ -1809,8 +1809,8 @@ class ViewerTests(unittest.TestCase):
             self.assertFalse(hasattr(controller,"audio_selection"))
             self.assertFalse(controller.findChildren(QProcess))
             order=Order()
-            controller.audio_order=order
-            controller.audio_order_ready(order)
+            controller.order=order
+            controller.order_ready(order)
             self.assertEqual(controller.path,str(first))  # Reading a snapshot never starts another track.
             window.present=lambda *_:self.fail("Navigation must not reactivate the viewer")
             QTest.keyClick(window,Qt.Key.Key_Right)
@@ -1830,7 +1830,7 @@ class ViewerTests(unittest.TestCase):
             self.assertFalse(window.isVisible())
             self.assertTrue(window.player.source().isEmpty())
             self.assertEqual(finished,[str(second)])
-            self.assertIsNone(controller.audio_order)
+            self.assertIsNone(controller.order)
         finally:
             controller.close_view()
             if controller.audio:self.audio_cleanup(controller.audio)

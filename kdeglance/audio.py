@@ -3,7 +3,7 @@
 import math
 import os
 from pathlib import Path
-from PyQt6.QtCore import Qt, QPoint, QEvent, QTimer, QSettings, QUrl, QPointF, QRectF, pyqtSignal, QThreadPool, QPropertyAnimation, QEasingCurve
+from PyQt6.QtCore import Qt, QPoint, QEvent, QTimer, QSettings, QUrl, QPointF, QRectF, pyqtSignal, QThreadPool, QPropertyAnimation, QEasingCurve, pyqtSlot
 from PyQt6.QtGui import QPainter, QColor, QLinearGradient, QFont, QImage
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QSlider, QToolTip, QApplication, QGraphicsOpacityEffect, QSizePolicy
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
@@ -177,24 +177,25 @@ class Artwork(QWidget):
         event.accept()
 
 
-class AudioWindow(PreviewWindow):
-    size_factor = 1.0
+class MediaWindow(PreviewWindow):
+    """Player, seek bar and volume panel shared by the audio and video previews."""
+    canvas_class = Artwork
+    settings_file = "audio.ini"
+    error_text = "Could not play audio"
+
     def __init__(self, close_callback, navigate_callback=None):
         super().__init__(close_callback, navigate_callback or (lambda _: None))
         old_canvas = self.canvas
         self.layout().removeWidget(old_canvas)
         old_canvas.hide()
         old_canvas.deleteLater()
-        self.canvas = Artwork(self)
+        self.canvas = self.canvas_class(self)
         self.canvas.closeRequested.connect(close_callback)
         self.canvas.navigateRequested.connect(self.navigate_callback)
         self.layout().addWidget(self.canvas)
         self.phase, self.path, self.error = "idle", "", ""
         self.seek_wheel_remainder = 0.0
-        self.generation, self.metadata_jobs = 0, {}
-        self.metadata_pool = QThreadPool(self)
-        self.metadata_pool.setMaxThreadCount(1)
-        config = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home()/".config")/"kdeglance2/audio.ini"
+        config = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home()/".config")/"kdeglance2"/self.settings_file
         self.settings = QSettings(str(config), QSettings.Format.IniFormat)
         try:
             volume = float(self.settings.value("volume", 0.5))
@@ -230,6 +231,7 @@ class AudioWindow(PreviewWindow):
         layout.addWidget(self.elapsed)
         layout.addWidget(self.seek_bar, 1)
         layout.addWidget(self.total)
+        self.add_controls(layout)
         self.speaker_slot = ControlSurface(self.controls)
         self.speaker_slot.setFixedSize(56,44)
         speaker_layout = QHBoxLayout(self.speaker_slot)
@@ -286,20 +288,13 @@ class AudioWindow(PreviewWindow):
         from interactions import install_interactions
         install_interactions(self)
 
-    def present(self, screen, token=""):
-        super().present(screen, token)
-        self.resize_audio(screen)
+    def add_controls(self, layout):
+        """Extra buttons between the total time and the speaker."""
 
-    def resize_audio(self, screen):
-        box = preview_size(screen)
-        self.apply_size(box.width(), box.height())
-
-    def open_audio(self, path):
-        self.stop_audio()
+    def reset_controls(self, path):
         self.seek_wheel_remainder = 0.0
         self.path, self.phase, self.error = path, "loading", ""
-        self.canvas.image, self.canvas.error = QImage(), ""
-        self.canvas.update()
+        self.canvas.error = ""
         self.seek_bar.dragging = False
         self.seek_bar.position_ms, self.seek_bar.duration_ms = 0, 0
         self.seek_bar.setEnabled(False)
@@ -307,27 +302,8 @@ class AudioWindow(PreviewWindow):
         self.total.setText("--:--")
         self.volume_panel.hide()
         self.setWindowTitle(Path(path).name+" — KDEGlance")
-        if not Path(path).is_file():
-            self.player_error(None, "File not found or not accessible")
-            return
-        job = MetadataJob(self.generation, path)
-        self.metadata_jobs[self.generation] = job
-        job.signals.done.connect(self.metadata_loaded)
-        self.metadata_pool.start(job)
-        self.player.setSource(QUrl.fromLocalFile(path))
-        self.player.play()
 
-    def metadata_loaded(self, generation, result):
-        self.metadata_jobs.pop(generation, None)
-        if generation != self.generation or self.phase == "idle":
-            return
-        self.canvas.image = result["cover"]
-        self.canvas.update()
-
-    def stop_audio(self):
-        self.generation += 1
-        for job in self.metadata_jobs.values():
-            job.cancelled.set()
+    def stop_player(self):
         self.dismiss_volume_panel()
         self.canvas.press_position = None
         self.player.stop()
@@ -336,11 +312,6 @@ class AudioWindow(PreviewWindow):
         self.seek_bar.setEnabled(False)
         self.phase = "idle"
         self.save_volume()
-
-    def hideEvent(self, event):
-        if hasattr(self, "player"):
-            self.stop_audio()
-        super().hideEvent(event)
 
     def toggle_play(self):
         if self.player.source().isEmpty() or self.phase == "error":
@@ -352,21 +323,24 @@ class AudioWindow(PreviewWindow):
                 self.player.setPosition(0)
             self.player.play()
 
+    @pyqtSlot(QMediaPlayer.PlaybackState)
     def playback_changed(self, state):
         self.play_button.playing = state == QMediaPlayer.PlaybackState.PlayingState
         self.play_button.update()
         if state in (QMediaPlayer.PlaybackState.PlayingState, QMediaPlayer.PlaybackState.PausedState):
             self.phase = "ready"
 
+    @pyqtSlot(QMediaPlayer.MediaStatus)
     def status_changed(self, status):
         if status == QMediaPlayer.MediaStatus.InvalidMedia:
             self.player_error(None, self.player.errorString())
         elif status == QMediaPlayer.MediaStatus.EndOfMedia:
             self.phase = "ready"
 
+    @pyqtSlot(QMediaPlayer.Error, str)
     def player_error(self, _error, text):
         self.player.stop()
-        self.phase, self.error = "error", text or "Could not play audio"
+        self.phase, self.error = "error", text or self.error_text
         self.canvas.error = self.error
         self.canvas.update()
         self.update_seekable()
@@ -456,6 +430,9 @@ class AudioWindow(PreviewWindow):
             self.set_volume(self.volume_level+delta/120*0.05)
         event.accept()
 
+    def canvas_wheel(self, event):
+        event.accept()
+
     def eventFilter(self, watched, event):
         if isinstance(watched, QWidget):
             if event.type() == QEvent.Type.Wheel:
@@ -468,6 +445,8 @@ class AudioWindow(PreviewWindow):
                         self.seek_wheel_remainder -= steps
                         self.player.setPosition(max(0,min(self.player.duration(),self.player.position()+steps*1000)))
                     event.accept()
+                elif watched is self.canvas:
+                    self.canvas_wheel(event)
                 else:
                     event.accept()
                 return True
@@ -479,14 +458,67 @@ class AudioWindow(PreviewWindow):
     def wheelEvent(self, event):
         event.accept()
 
-    def fit(self):
-        pass
-
     def snapshot(self):
         return {"phase": self.phase, "error": self.error,
                 "playing": self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState,
                 "playback_state": self.player.playbackState().name,
                 "position_ms": self.player.position(), "duration_ms": self.player.duration(),
                 "volume": round(self.output.volume(), 5), "seekable": self.player.isSeekable(),
-                "source_empty": self.player.source().isEmpty(), "has_cover": not self.canvas.image.isNull(),
+                "source_empty": self.player.source().isEmpty(),
                 "volume_panel_visible": self.volume_panel.isVisible()}
+
+
+class AudioWindow(MediaWindow):
+    size_factor = 1.0
+    def __init__(self, close_callback, navigate_callback=None):
+        super().__init__(close_callback, navigate_callback)
+        self.generation, self.metadata_jobs = 0, {}
+        self.metadata_pool = QThreadPool(self)
+        self.metadata_pool.setMaxThreadCount(1)
+
+    def present(self, screen, token=""):
+        super().present(screen, token)
+        self.resize_audio(screen)
+
+    def resize_audio(self, screen):
+        box = preview_size(screen)
+        self.apply_size(box.width(), box.height())
+
+    def open_audio(self, path):
+        self.stop_audio()
+        self.reset_controls(path)
+        self.canvas.image = QImage()
+        self.canvas.update()
+        if not Path(path).is_file():
+            self.player_error(None, "File not found or not accessible")
+            return
+        job = MetadataJob(self.generation, path)
+        self.metadata_jobs[self.generation] = job
+        job.signals.done.connect(self.metadata_loaded)
+        self.metadata_pool.start(job)
+        self.player.setSource(QUrl.fromLocalFile(path))
+        self.player.play()
+
+    def metadata_loaded(self, generation, result):
+        self.metadata_jobs.pop(generation, None)
+        if generation != self.generation or self.phase == "idle":
+            return
+        self.canvas.image = result["cover"]
+        self.canvas.update()
+
+    def stop_audio(self):
+        self.generation += 1
+        for job in self.metadata_jobs.values():
+            job.cancelled.set()
+        self.stop_player()
+
+    def hideEvent(self, event):
+        if hasattr(self, "metadata_jobs"):
+            self.stop_audio()
+        super().hideEvent(event)
+
+    def fit(self):
+        pass
+
+    def snapshot(self):
+        return {**super().snapshot(), "has_cover": not self.canvas.image.isNull()}

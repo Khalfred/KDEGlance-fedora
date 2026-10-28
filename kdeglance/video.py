@@ -1,17 +1,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Independent video preview with the accepted music controls, left unchanged."""
 import json
-import math
-import os
 from pathlib import Path
 import subprocess
-from PyQt6.QtCore import Qt, QPoint, QPointF, QEvent, QTimer, QSettings, QUrl, QRectF, QSize, QPropertyAnimation, QEasingCurve, pyqtSignal, pyqtSlot
+from PyQt6.QtCore import Qt, QPointF, QUrl, QRectF, QSize, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QPainter, QColor, QLinearGradient, QFont
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSlider, QGraphicsOpacityEffect, QSizePolicy
-from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput, QVideoSink, QVideoFrame
-from interactions import ActionButton, install_interactions
-from window import PreviewWindow, fill_scale, fit_box, preview_size
-from audio import Artwork, SeekBar, IconButton, ControlSurface, VolumePanel, time_text
+from PyQt6.QtMultimedia import QMediaPlayer, QVideoSink, QVideoFrame
+from interactions import ActionButton
+from window import fill_scale, fit_box, preview_size
+from audio import Artwork, MediaWindow
 
 
 
@@ -129,122 +126,28 @@ class VideoCanvas(Artwork):
         self.last = QPointF(position)
 
 
-class VideoWindow(PreviewWindow):
+class VideoWindow(MediaWindow):
+    canvas_class = VideoCanvas
+    settings_file = "video.ini"
+    error_text = "Could not play video"
+
     def __init__(self, close_callback, navigate_callback=None):
-        super().__init__(close_callback, navigate_callback or (lambda _: None))
-        old_canvas = self.canvas
-        self.layout().removeWidget(old_canvas)
-        old_canvas.hide()
-        old_canvas.deleteLater()
-        self.canvas = VideoCanvas(self)
-        self.canvas.closeRequested.connect(close_callback)
-        self.canvas.navigateRequested.connect(self.navigate_callback)
+        super().__init__(close_callback, navigate_callback)
         self.canvas.zoomChanged.connect(self.resize_for_video_zoom)
-        self.layout().addWidget(self.canvas)
-        self.phase, self.path, self.error = "idle", "", ""
         self.frames_received = 0
         self.video_dimensions = QSize()
         self.manual_rotation = 0
-        self.seek_wheel_remainder = 0.0
-        config = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home()/".config")/"kdeglance2/video.ini"
-        self.settings = QSettings(str(config), QSettings.Format.IniFormat)
-        try:
-            volume = float(self.settings.value("volume", 0.5))
-            if not math.isfinite(volume):
-                volume = 0.5
-        except (ValueError, TypeError):
-            volume = 0.5
-        self.output = QAudioOutput(self)
-        self.volume_level = max(0.0, min(1.0, volume))
-        self.output.setVolume(self.volume_level)
-        self.player = QMediaPlayer(self)
-        self.player.setAudioOutput(self.output)
         self.video_sink = QVideoSink(self)
         self.player.setVideoSink(self.video_sink)
         self.video_sink.videoFrameChanged.connect(self.frame_changed)
-        self.save_timer = QTimer(self)
-        self.save_timer.setSingleShot(True)
-        self.save_timer.timeout.connect(self.save_volume)
-        cover_layout = QVBoxLayout(self.canvas)
-        cover_layout.setContentsMargins(0, 0, 0, 0)
-        cover_layout.setSpacing(0)
-        cover_layout.addStretch()
-        self.controls = ControlSurface(self.canvas)
-        self.controls.setFixedHeight(64)
-        layout = QHBoxLayout(self.controls)
-        layout.setContentsMargins(12, 10, 12, 10)
-        layout.setSpacing(7)
-        self.play_button, self.speaker_button = IconButton("play"), IconButton("volume")
-        self.elapsed, self.total = QLabel("00:00"), QLabel("--:--")
-        for label in (self.elapsed, self.total):
-            label.setStyleSheet("color:#f7f8fa;background:transparent;font-size:12px;")
-            label.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
-        self.seek_bar = SeekBar(self.controls)
-        self.seek_bar.setMinimumWidth(44)
-        layout.addWidget(self.play_button)
-        layout.addWidget(self.elapsed)
-        layout.addWidget(self.seek_bar, 1)
-        layout.addWidget(self.total)
+
+    def add_controls(self, layout):
         self.rotate_button = ActionButton("rotate", self.controls)
         self.fullscreen_button = ActionButton("fullscreen", self.controls)
         self.rotate_button.clicked.connect(self.rotate_video)
         self.fullscreen_button.clicked.connect(self.toggle_fullscreen)
         layout.addWidget(self.rotate_button)
         layout.addWidget(self.fullscreen_button)
-        self.speaker_slot = ControlSurface(self.controls)
-        self.speaker_slot.setFixedSize(56,44)
-        speaker_layout = QHBoxLayout(self.speaker_slot)
-        speaker_layout.setContentsMargins(0,0,0,0)
-        speaker_layout.addWidget(self.speaker_button,0,Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.speaker_slot)
-        cover_layout.addWidget(self.controls)
-        self.volume_panel = VolumePanel(self.canvas)
-        self.volume_panel.setFixedWidth(56)
-        self.volume_panel.resize(56, 212)
-        panel_layout = QVBoxLayout(self.volume_panel)
-        panel_layout.setContentsMargins(9, 12, 9, 72)
-        panel_layout.setSpacing(10)
-        self.percent = QLabel(self.volume_panel)
-        self.percent.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.percent.setStyleSheet("color:#f1f4f8;background:transparent;font-size:13px;")
-        panel_layout.addWidget(self.percent)
-        self.volume_slider = QSlider(Qt.Orientation.Vertical, self.volume_panel)
-        self.volume_slider.setRange(0, 100)
-        self.volume_slider.setValue(round(self.output.volume()*100))
-        self.volume_slider.setAccessibleName("Volume")
-        self.volume_slider.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.volume_slider.setStyleSheet("""
-            QSlider { background: transparent; }
-            QSlider::groove:vertical { background: rgba(255,255,255,45); width: 6px; border-radius: 3px; }
-            QSlider::add-page:vertical { background: #f1f4f8; border-radius: 3px; }
-            QSlider::handle:vertical { background: white; height: 14px; margin: 0 -5px; border-radius: 7px; }
-        """)
-        panel_layout.addWidget(self.volume_slider, 1, Qt.AlignmentFlag.AlignHCenter)
-        self.volume_opacity = QGraphicsOpacityEffect(self.volume_panel)
-        self.volume_panel.setGraphicsEffect(self.volume_opacity)
-        self.volume_opacity.setOpacity(1)
-        self.volume_fade = QPropertyAnimation(self.volume_opacity, b"opacity", self)
-        self.volume_fade.setDuration(220)
-        self.volume_fade.setEasingCurve(QEasingCurve.Type.OutQuad)
-        self.volume_fade.finished.connect(self.finish_volume_fade)
-        self.volume_panel.hide()
-        self.percent_timer = QTimer(self)
-        self.percent_timer.setSingleShot(True)
-        self.percent_timer.timeout.connect(self.hide_volume_panel)
-        self.play_button.clicked.connect(self.toggle_play)
-        self.speaker_button.clicked.connect(self.toggle_volume_panel)
-        self.volume_slider.valueChanged.connect(lambda value: self.set_volume(value/100))
-        self.seek_bar.seekRequested.connect(self.player.setPosition)
-        self.player.positionChanged.connect(self.position_changed)
-        self.player.durationChanged.connect(self.duration_changed)
-        self.player.seekableChanged.connect(lambda _: self.update_seekable())
-        self.player.playbackStateChanged.connect(self.playback_changed)
-        self.player.mediaStatusChanged.connect(self.status_changed)
-        self.player.errorOccurred.connect(self.player_error)
-        for widget in [self.canvas, *self.canvas.findChildren(QWidget)]:
-            widget.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-            widget.installEventFilter(self)
-        install_interactions(self)
 
     def present(self, screen, token=""):
         if not self.isVisible() and self.isFullScreen():
@@ -335,21 +238,14 @@ class VideoWindow(PreviewWindow):
 
     def open_video(self, path):
         self.stop_video()
-        self.path, self.phase, self.error = path, "loading", ""
-        self.canvas.frame, self.canvas.error = QVideoFrame(), ""
+        self.reset_controls(path)
+        self.canvas.frame = QVideoFrame()
         self.frames_received = 0
         self.video_dimensions = QSize()
-        self.manual_rotation, self.seek_wheel_remainder = 0, 0.0
+        self.manual_rotation = 0
         self.canvas.manual_rotation = 0
         self.canvas.zoom, self.canvas.pan = 1.0, QPointF()
         self.canvas.update()
-        self.seek_bar.dragging = False
-        self.seek_bar.position_ms, self.seek_bar.duration_ms = 0, 0
-        self.seek_bar.setEnabled(False)
-        self.elapsed.setText("00:00")
-        self.total.setText("--:--")
-        self.volume_panel.hide()
-        self.setWindowTitle(Path(path).name+" — KDEGlance")
         if not Path(path).is_file():
             self.content_size = None
             self.player_error(None, "File not found or not accessible")
@@ -376,129 +272,26 @@ class VideoWindow(PreviewWindow):
             self.canvas.update()
 
     def stop_video(self):
-        self.dismiss_volume_panel()
-        self.canvas.press_position = None
-        self.player.stop()
-        self.player.setSource(QUrl())
+        self.stop_player()
         self.canvas.frame = QVideoFrame()
         self.canvas.update()
-        self.seek_bar.dragging = False
-        self.seek_bar.setEnabled(False)
-        self.phase = "idle"
-        self.save_volume()
 
     def hideEvent(self, event):
-        if hasattr(self, "player"):
+        if hasattr(self, "video_sink"):
             self.stop_video()
         super().hideEvent(event)
 
-    def toggle_play(self):
-        if self.player.source().isEmpty() or self.phase == "error":
-            return
-        if self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
-            self.player.pause()
-        else:
-            if self.player.mediaStatus() == QMediaPlayer.MediaStatus.EndOfMedia:
-                self.player.setPosition(0)
-            self.player.play()
-
-    @pyqtSlot(QMediaPlayer.PlaybackState)
-    def playback_changed(self, state):
-        self.play_button.playing = state == QMediaPlayer.PlaybackState.PlayingState
-        self.play_button.update()
-        if state in (QMediaPlayer.PlaybackState.PlayingState, QMediaPlayer.PlaybackState.PausedState):
-            self.phase = "ready"
-
     @pyqtSlot(QMediaPlayer.MediaStatus)
     def status_changed(self, status):
-        if status == QMediaPlayer.MediaStatus.InvalidMedia:
-            self.player_error(None, self.player.errorString())
-        elif status in (QMediaPlayer.MediaStatus.LoadedMedia, QMediaPlayer.MediaStatus.BufferedMedia) and not self.player.hasVideo():
+        if (status in (QMediaPlayer.MediaStatus.LoadedMedia, QMediaPlayer.MediaStatus.BufferedMedia)
+                and not self.player.hasVideo()):
             self.player_error(None, "The file has no video track")
-        elif status == QMediaPlayer.MediaStatus.EndOfMedia:
-            self.phase = "ready"
-
-    @pyqtSlot(QMediaPlayer.Error, str)
-    def player_error(self, _error, text):
-        self.player.stop()
-        self.phase, self.error = "error", text or "Could not play video"
-        self.canvas.error = self.error
-        self.canvas.update()
-        self.update_seekable()
-
-    def position_changed(self, position):
-        self.seek_bar.position(position)
-        self.elapsed.setText(time_text(self.seek_bar.position_ms))
-
-    def duration_changed(self, duration):
-        self.seek_bar.duration_ms = max(0, duration)
-        self.total.setText(time_text(duration) if duration > 0 else "--:--")
-        self.update_seekable()
-
-    def update_seekable(self):
-        self.seek_bar.setEnabled(self.player.isSeekable() and self.player.duration() > 0 and self.phase != "error")
-
-    def save_volume(self):
-        self.save_timer.stop()
-        self.settings.setValue("volume", float(self.output.volume()))
-        self.settings.sync()
-
-    def set_volume(self, value):
-        value = max(0.0, min(1.0, value))
-        self.volume_level = value
-        self.output.setVolume(value)
-        self.volume_slider.blockSignals(True)
-        self.volume_slider.setValue(round(value*100))
-        self.volume_slider.blockSignals(False)
-        self.percent.setText(f"{round(value*100)}%")
-        self.show_volume_panel()
-        self.save_timer.start(250)
-
-    def position_volume_panel(self):
-        # One continuous surface rises from the existing speaker slot.
-        anchor = self.speaker_slot.mapTo(self.canvas,QPoint())
-        top = self.controls.mapTo(self.canvas,QPoint()).y()
-        height = max(1,min(200,top-20))
-        bottom = min(self.canvas.height()-4,anchor.y()+self.speaker_slot.height()+6)
-        self.volume_panel.setGeometry(anchor.x(),max(0,top-height),self.speaker_slot.width(),bottom-(top-height))
-
-    def show_volume_panel(self):
-        self.volume_fade.stop()
-        self.volume_opacity.setOpacity(1)
-        self.percent.setText(f"{round(self.output.volume()*100)}%")
-        self.position_volume_panel()
-        self.volume_panel.raise_()
-        self.volume_panel.show()
-        self.controls.raise_()
-        self.percent_timer.start(1500)
-
-    def hide_volume_panel(self):
-        if self.volume_slider.isSliderDown():
-            self.percent_timer.start(300)
-            return
-        self.volume_fade.setStartValue(self.volume_opacity.opacity())
-        self.volume_fade.setEndValue(0)
-        self.volume_fade.start()
-
-    def finish_volume_fade(self):
-        if self.volume_opacity.opacity() <= 0:
-            self.volume_panel.hide()
-
-    def dismiss_volume_panel(self):
-        self.percent_timer.stop()
-        self.volume_fade.stop()
-        self.volume_panel.hide()
-        self.volume_opacity.setOpacity(1)
-
-    def toggle_volume_panel(self):
-        if self.volume_panel.isVisible():
-            self.dismiss_volume_panel()
         else:
-            self.show_volume_panel()
+            super().status_changed(status)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        if hasattr(self, "volume_panel"):
+        if hasattr(self, "video_sink"):
             # Keep the same controls usable on native-size portrait videos.
             compact = self.width() < 340
             self.controls.layout().setContentsMargins(6 if compact else 12, 10, 6 if compact else 12, 10)
@@ -516,40 +309,8 @@ class VideoWindow(PreviewWindow):
             self.update_video_scale()
             self.canvas.clamp_pan()
 
-    def volume_wheel(self, event):
-        delta = event.angleDelta().y() or event.pixelDelta().y()
-        if delta:
-            # Keep fractional touchpad increments in double precision rather
-            # than quantizing each event to the integer slider percentage.
-            if abs(self.output.volume()-self.volume_level) > 1e-6:
-                self.volume_level = self.output.volume()
-            self.set_volume(self.volume_level+delta/120*0.05)
-        event.accept()
-
-    def eventFilter(self, watched, event):
-        if isinstance(watched, QWidget):
-            if event.type() == QEvent.Type.Wheel:
-                if watched is self.speaker_button:
-                    self.volume_wheel(event)
-                elif watched is self.seek_bar:
-                    if self.player.isSeekable():
-                        self.seek_wheel_remainder += (event.angleDelta().y() or event.pixelDelta().y())/120
-                        steps = math.trunc(self.seek_wheel_remainder)
-                        self.seek_wheel_remainder -= steps
-                        self.player.setPosition(max(0,min(self.player.duration(),self.player.position()+steps*1000)))
-                    event.accept()
-                elif watched is self.canvas:
-                    self.canvas.zoom_wheel(event)
-                else:
-                    event.accept()
-                return True
-            if event.type() == QEvent.Type.KeyPress and event.key() in (Qt.Key.Key_Space, Qt.Key.Key_Escape):
-                self.keyPressEvent(event)
-                return True
-        return super().eventFilter(watched, event)
-
-    def wheelEvent(self, event):
-        event.accept()
+    def canvas_wheel(self, event):
+        self.canvas.zoom_wheel(event)
 
     def fit(self):
         self.canvas.zoom, self.canvas.pan = 1.0, QPointF()
@@ -557,15 +318,9 @@ class VideoWindow(PreviewWindow):
         self.canvas.update()
 
     def snapshot(self):
-        return {"phase": self.phase, "error": self.error,
-                "playing": self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState,
-                "playback_state": self.player.playbackState().name,
-                "position_ms": self.player.position(), "duration_ms": self.player.duration(),
-                "volume": round(self.output.volume(), 5), "seekable": self.player.isSeekable(),
-                "source_empty": self.player.source().isEmpty(), "has_frame": self.canvas.frame.isValid(),
+        return {**super().snapshot(), "has_frame": self.canvas.frame.isValid(),
                 "frames_received": self.frames_received,
                 "has_video": self.player.hasVideo(), "has_audio": self.player.hasAudio(),
                 "frame_size": [self.canvas.frame.width(), self.canvas.frame.height()],
                 "display_size": [self.video_dimensions.width(), self.video_dimensions.height()],
-                "zoom": self.canvas.zoom, "rotation": self.manual_rotation,
-                "volume_panel_visible": self.volume_panel.isVisible()}
+                "zoom": self.canvas.zoom, "rotation": self.manual_rotation}
