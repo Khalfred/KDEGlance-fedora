@@ -866,6 +866,8 @@ class ViewerTests(unittest.TestCase):
         from PyQt6.QtGui import QImageReader
 
         class ReaderWithoutSizeProbe:
+            supportedImageFormats = staticmethod(QImageReader.supportedImageFormats)
+
             def __init__(self, path):
                 self.reader = QImageReader(path)
 
@@ -1278,7 +1280,14 @@ class ViewerTests(unittest.TestCase):
             controller.request(json.dumps({"paths": [str(self.first), str(self.second), str(self.gif)]}), False)
             ready()
             controller.order = Selection(str(self.first))
-            controller.window.present = lambda *_: self.fail("Navigation must not reactivate the viewer")
+            # Each step changes the image shape, so the window is re-presented to let
+            # KWin center the new size, but navigation never passes an activation token.
+            # (Raising inside this Qt callback would abort the whole test process.)
+            presents, real_present = [], controller.window.present
+            def present(screen, token=""):
+                presents.append((controller.path, token))
+                real_present(screen, token)
+            controller.window.present = present
             QTest.keyClick(controller.window, Qt.Key.Key_Right)
             ready()
             self.assertEqual(selected, [str(self.second)])
@@ -1287,6 +1296,7 @@ class ViewerTests(unittest.TestCase):
             QTest.keyClick(controller.window, Qt.Key.Key_Left)
             ready()
             self.assertEqual(selected, [str(self.second), str(self.gif), str(self.second)])
+            self.assertEqual(presents, [(str(self.second), ""), (str(self.gif), ""), (str(self.second), "")])
             self.assertTrue(controller.state()["dolphin_selection_synced"])
             # A cancelled decode must not replace the last image actually displayed.
             controller.load(str(self.first))
