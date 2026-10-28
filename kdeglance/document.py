@@ -11,7 +11,7 @@ import tarfile
 import zipfile
 from PyQt6.QtCore import (Qt, QDateTime, QEvent, QFileInfo, QLocale, QMargins, QMimeDatabase, QPointF,
                           QProcess, QSize, QThreadPool, QTimer, QUrl)
-from PyQt6.QtGui import QColor, QFontDatabase, QIcon, QImage, QPainter, QPixmap
+from PyQt6.QtGui import QColor, QFontDatabase, QFontMetrics, QIcon, QImage, QPainter, QPixmap
 from PyQt6.QtPdf import QPdfDocument, QPdfDocumentRenderOptions
 from PyQt6.QtPdfWidgets import QPdfView
 from PyQt6.QtWidgets import (QAbstractItemView, QAbstractScrollArea, QFormLayout, QHBoxLayout,
@@ -629,9 +629,13 @@ class DocumentWindow(PreviewWindow):
             if not event.isAutoRepeat():
                 self.close_callback()
             return True
-        if key in (Qt.Key.Key_Left, Qt.Key.Key_Right):
+        if key in (Qt.Key.Key_Left, Qt.Key.Key_Right) or (
+                key in (Qt.Key.Key_Up, Qt.Key.Key_Down) and self.kind in ("info", "folder")):
             if not event.isAutoRepeat():
-                self.navigate_callback(-1 if key == Qt.Key.Key_Left else 1)
+                self.navigate_callback(-1 if key in (Qt.Key.Key_Left, Qt.Key.Key_Up) else 1)
+            return True
+        if key in (Qt.Key.Key_Up, Qt.Key.Key_Down) and isinstance(self.content, QAbstractScrollArea):
+            self.scroll_lines(-3 if key == Qt.Key.Key_Up else 3)
             return True
         if self.pdf_view is not None:
             back = key in (Qt.Key.Key_Up, Qt.Key.Key_PageUp)
@@ -645,6 +649,12 @@ class DocumentWindow(PreviewWindow):
                 self.go_to_page(0 if key == Qt.Key.Key_Home else self.pdf.pageCount()-1)
                 return True
         return False
+
+    def scroll_lines(self, lines):
+        # QPlainTextEdit scrolls by whole lines; QTextBrowser (code, Markdown) by pixels.
+        view = self.content
+        step = 1 if isinstance(view, QPlainTextEdit) else QFontMetrics(view.document().defaultFont()).lineSpacing()
+        view.verticalScrollBar().setValue(view.verticalScrollBar().value() + lines*step)
 
     def keyPressEvent(self, event):
         if event.modifiers() == Qt.KeyboardModifier.NoModifier and self.handle_key(event):

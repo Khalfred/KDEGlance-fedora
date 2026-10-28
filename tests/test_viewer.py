@@ -1957,6 +1957,48 @@ class ViewerTests(unittest.TestCase):
             window.hide()
             window.deleteLater()
 
+    def test_57_info_up_down_change_file_text_up_down_scroll_three_lines(self):
+        from document import DocumentWindow
+        blob = self.home/"documents/blob.bin"
+        code = self.home/"documents/long.py"
+        plain = self.home/"documents/huge.txt"  # Too large to highlight: plain text view.
+        blob.parent.mkdir(exist_ok=True)
+        blob.write_bytes(bytes(range(256)) * 4)
+        code.write_text("".join(f"# line {n}\n" for n in range(300)))
+        plain.write_text("".join(f"{'x' * 2000} line {n}\n" for n in range(300)))
+        navigation = []
+        window = DocumentWindow(lambda: None, navigation.append)
+        try:
+            # Information panels: Up/Left go back, Down/Right go forward.
+            window.open_document(str(blob))
+            window.present(app.primaryScreen())
+            self.assertEqual(window.kind, "info")
+            for key in (Qt.Key.Key_Up, Qt.Key.Key_Left, Qt.Key.Key_Down, Qt.Key.Key_Right):
+                QTest.keyClick(window, key)
+            self.assertEqual(navigation, [-1, -1, 1, 1])
+            # Text and code: Up/Down scroll three lines and never change file.
+            navigation.clear()
+            import highlight
+            for path, kind in ((code, "code" if highlight.available() else "text"), (plain, "text")):
+                window.open_document(str(path))
+                self.audio_wait(lambda: window.phase == "ready")
+                self.assertEqual(window.kind, kind)
+                view = window.content
+                # Code views prefix a line number, so compare the end of the top line.
+                top_line = lambda: view.cursorForPosition(QPoint(4, 4)).block().text().split("line ")[-1].strip()
+                app.processEvents()
+                self.assertEqual(top_line(), "0")
+                QTest.keyClick(window, Qt.Key.Key_Down)
+                self.assertEqual(top_line(), "3")
+                QTest.keyClick(window, Qt.Key.Key_Down)
+                self.assertEqual(top_line(), "6")
+                QTest.keyClick(window, Qt.Key.Key_Up)
+                self.assertEqual(top_line(), "3")
+            self.assertEqual(navigation, [])
+        finally:
+            window.hide()
+            window.deleteLater()
+
 
 if __name__ == "__main__":
     import faulthandler

@@ -159,6 +159,7 @@ kdeglance state
 | Escape | Close; in fullscreen video, leave fullscreen first |
 | Left / Right | Previous / next item, including mixed media |
 | Up / Down, PageUp / PageDown | In PDF and office documents: previous / next page; past the first / last page, previous / next file |
+| Up / Down | In text, code and Markdown: scroll three lines; in information panels: previous / next file |
 | Home / End | In PDF and office documents: first / last page |
 | Mouse wheel on a document page | Previous / next page |
 | Center image/cover click | Close preview |
