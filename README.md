@@ -84,6 +84,26 @@ the project's own files and system files were used; see
 | --- | --- |
 | ![Fitted image preview](screenshots/port-image.png) | ![Vertical video preview](screenshots/port-video.png) |
 
+## Requirements
+
+- Fedora KDE (Plasma **6**, Dolphin **24.02+**) in a Wayland session.
+- Python **3.10+**, PyQt6/Qt **6.8+** with Qt Multimedia and Qt PDF, image-format
+  plugins (`qt6-qtimageformats`, `kf6-kimageformats`, `qt6-qtsvg`).
+- PyGObject/Gio, AT-SPI accessibility for Dolphin order/current-item integration.
+- A user D-Bus session and user systemd manager; KIO Fuse/KIO extras for SMB.
+- Build only: a C++ compiler, pkg-config and Qt/KF6 WindowSystem headers for the
+  activation bridge. The source contains no precompiled `.so`; the release RPM
+  ships one built for Fedora 44.
+- Optional, recommended by the package: LibreOffice (office documents), 7-Zip
+  (7z/RAR listings), `ffprobe` from FFmpeg (fitted video windows) and
+  `kf6-syntax-highlighting` (code colors). Fedora's default FFmpeg lacks
+  H.264/HEVC; see FEDORA-INSTALL.md for the RPM Fusion codecs.
+
+The exact Fedora package names are in
+[packaging/fedora/kdeglance.spec](packaging/fedora/kdeglance.spec); `dnf` resolves
+them. The package uses the system Mutagen; a bundled copy (1.48.1) remains in the
+source with its license notices.
+
 ## Installation
 
 On Fedora KDE, in a normal Plasma Wayland user session.
@@ -207,34 +227,6 @@ kdeglance state
 | Image rotation / reflection icons | Rotate 90° counterclockwise / mirror horizontally |
 | Video rotation / fullscreen icons | Rotate 90° counterclockwise / toggle fullscreen |
 | Focus outside preview | Close without requiring an always-on-top/modal window |
-
-## Requirements
-
-- Fedora KDE (Plasma **6**, Dolphin **24.02+**) in a Wayland session.
-- Python **3.10+**, PyQt6/Qt **6.8+** with Qt Multimedia and Qt PDF, image-format
-  plugins (`qt6-qtimageformats`, `kf6-kimageformats`, `qt6-qtsvg`).
-- PyGObject/Gio, AT-SPI accessibility for Dolphin order/current-item integration.
-- A user D-Bus session and user systemd manager; KIO Fuse/KIO extras for SMB.
-- Build only: a C++ compiler, pkg-config and Qt/KF6 WindowSystem headers for the
-  activation bridge. No precompiled `.so` is distributed.
-- Optional, recommended by the package: LibreOffice (office documents), 7-Zip
-  (7z/RAR listings), `ffprobe` from FFmpeg (fitted video windows) and
-  `kf6-syntax-highlighting` (code colors). Fedora's default FFmpeg lacks
-  H.264/HEVC; see FEDORA-INSTALL.md for the RPM Fusion codecs.
-
-The exact Fedora package names are in
-[packaging/fedora/kdeglance.spec](packaging/fedora/kdeglance.spec); `dnf` resolves
-them. The package uses the system Mutagen; a bundled copy (1.48.1) remains in the
-source with its license notices.
-
-## Supported Distributions
-
-| Distribution | Status |
-| --- | --- |
-| Fedora KDE 44, Plasma 6 / Wayland | Supported target of this port. Developed and tested on Ultramarine 44 (Fedora 44 KDE base, same packages); not yet tested on a clean stock Fedora install |
-| Other Fedora releases / Fedora-based KDE spins | Expected to work with the RPM if Qt/PyQt are 6.8+; not tested |
-| Arch Linux / CachyOS | Use [upstream KDEGlance](https://github.com/AlexGraveler/KDEGlance); this port's changes are not tested there |
-| Kubuntu, Plasma X11, other desktops | Not supported |
 
 ## Known Limitations
 
