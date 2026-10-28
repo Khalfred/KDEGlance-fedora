@@ -113,6 +113,10 @@ bash packaging/fedora/build.sh
 sudo dnf install ~/rpmbuild/RPMS/x86_64/kdeglance-1.0.1-*.x86_64.rpm
 ```
 
+On Fedora 44 you can skip the build: download the RPM from the
+[latest release](https://github.com/Khalfred/KDEGlance-fedora/releases/latest) and
+run `sudo dnf install ./kdeglance-*.x86_64.rpm`.
+
 `dnf` installs the runtime dependencies. Installing the package does not change
 HOME, keyboard shortcuts or running services. Then, as your normal user:
 
@@ -124,6 +128,20 @@ kbuildsycoca6 --noincremental
 Fully quit and reopen Dolphin. See
 [FEDORA-INSTALL.md](packaging/fedora/FEDORA-INSTALL.md) for updates, codecs,
 settings, migrating from a manual install, and removal.
+
+To update a source install, pull and rebuild, then install the exact new file
+(older builds stay in `~/rpmbuild/RPMS`, so a `*` pattern would match them too):
+
+```bash
+cd KDEGlance-fedora
+git pull
+bash packaging/fedora/build.sh   # lists the built RPMs; the highest release is the new one
+sudo dnf install ~/rpmbuild/RPMS/x86_64/kdeglance-<version>-<release>.x86_64.rpm
+systemctl --user restart kdeglance2.service
+```
+
+A GitHub "Download ZIP" cannot be built: `build.sh` packages the git checkout,
+so use `git clone`.
 
 Upstream's Arch/CachyOS installer (`install.sh`, [INSTALL.md](INSTALL.md)) and
 Arch packaging ([packaging/aur](packaging/aur)) are kept for reference; the
