@@ -10,8 +10,8 @@
 > Changes in this port:
 > - Fedora RPM packaging in [packaging/fedora](packaging/fedora) — see
 >   [FEDORA-INSTALL.md](packaging/fedora/FEDORA-INSTALL.md).
-> - Previews for PDF and office documents (page-thumbnail sidebar, arrow keys
->   turn pages), text/code/JSON/Markdown, and archive listings.
+> - Previews for PDF and office documents (page-thumbnail sidebar, Up/Down
+>   turn pages, Left/Right change file), text/code/JSON/Markdown, and archive listings.
 > - An information panel (thumbnail and properties) for folders, executables and
 >   any other file; the Dolphin action is offered for every file and folder.
 > - More image and audio formats; syntax-highlighted code previews.
@@ -158,7 +158,7 @@ kdeglance state
 | Space | Open from Dolphin after manual binding; close an active preview |
 | Escape | Close; in fullscreen video, leave fullscreen first |
 | Left / Right | Previous / next item, including mixed media |
-| Left / Right / Up / Down, PageUp / PageDown | In PDF and office documents: previous / next page; past the first / last page, previous / next file |
+| Up / Down, PageUp / PageDown | In PDF and office documents: previous / next page; past the first / last page, previous / next file |
 | Home / End | In PDF and office documents: first / last page |
 | Mouse wheel on a document page | Previous / next page |
 | Center image/cover click | Close preview |

@@ -48,9 +48,10 @@ journalctl --user -u kdeglance2.service -b --no-pager -n 50
   PPTX, … converted to PDF with LibreOffice and cached in ~/.cache/kdeglance2),
   ZIP/tar/7z archive listings. PDFs and office documents open in a taller
   window (90% of screen height) showing one whole page with a page-thumbnail
-  sidebar: Left/Right/Up/Down, PageUp/PageDown and the wheel turn pages,
-  Home/End jump to the first/last page, and pressing past the first/last page
-  moves to the previous/next file. Folders, executables (ELF/AppImage/Windows PE/scripts), launchers and
+  sidebar: Up/Down, PageUp/PageDown and the wheel turn pages, Home/End jump
+  to the first/last page, and pressing Up/Down past the first/last page moves
+  to the previous/next file. Left/Right always move to the previous/next file,
+  in every preview. Folders, executables (ELF/AppImage/Windows PE/scripts), launchers and
   any other file show a thumbnail (from Dolphin's cache, else the file icon) and
   properties: type, size, folder contents, location, dates, permissions, owner.
   The Dolphin action is offered for every file and folder.

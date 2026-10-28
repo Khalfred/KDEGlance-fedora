@@ -623,15 +623,19 @@ class DocumentWindow(PreviewWindow):
         self.apply_size(box.width(), box.height())
 
     def handle_key(self, event):
-        """Space/Escape close; arrows turn pages, and change file past the first/last page."""
+        """Space/Escape close; Left/Right change file; Up/Down turn pages, and change file past the first/last page."""
         key = event.key()
         if key in (Qt.Key.Key_Space, Qt.Key.Key_Escape):
             if not event.isAutoRepeat():
                 self.close_callback()
             return True
+        if key in (Qt.Key.Key_Left, Qt.Key.Key_Right):
+            if not event.isAutoRepeat():
+                self.navigate_callback(-1 if key == Qt.Key.Key_Left else 1)
+            return True
         if self.pdf_view is not None:
-            back = key in (Qt.Key.Key_Left, Qt.Key.Key_Up, Qt.Key.Key_PageUp)
-            forward = key in (Qt.Key.Key_Right, Qt.Key.Key_Down, Qt.Key.Key_PageDown)
+            back = key in (Qt.Key.Key_Up, Qt.Key.Key_PageUp)
+            forward = key in (Qt.Key.Key_Down, Qt.Key.Key_PageDown)
             if back or forward:
                 step = -1 if back else 1
                 if not self.go_to_page(self.current_page()+step) and not event.isAutoRepeat():
@@ -639,13 +643,6 @@ class DocumentWindow(PreviewWindow):
                 return True
             if key in (Qt.Key.Key_Home, Qt.Key.Key_End):
                 self.go_to_page(0 if key == Qt.Key.Key_Home else self.pdf.pageCount()-1)
-                return True
-            return False
-        if key in (Qt.Key.Key_Left, Qt.Key.Key_Right):
-            bar = self.content.horizontalScrollBar() if isinstance(self.content, QAbstractScrollArea) else None
-            if bar is None or not bar.isVisible():
-                if not event.isAutoRepeat():
-                    self.navigate_callback(-1 if key == Qt.Key.Key_Left else 1)
                 return True
         return False
 

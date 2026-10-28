@@ -1913,6 +1913,50 @@ class ViewerTests(unittest.TestCase):
         finally:
             self.audio_cleanup(window)
 
+    def test_56_document_left_right_change_file_up_down_turn_pages(self):
+        from document import DocumentWindow
+        pdf = self.home/"documents/three-pages.pdf"
+        wide = self.home/"documents/wide.txt"
+        pdf.parent.mkdir(exist_ok=True)
+        pages = [Image.new("RGB", (200, 280), color) for color in ("red", "green", "blue")]
+        pages[0].save(pdf, save_all=True, append_images=pages[1:])
+        wide.write_text(("x" * 3000 + "\n") * 5)
+        navigation = []
+        window = DocumentWindow(lambda: None, navigation.append)
+        try:
+            window.open_document(str(pdf))
+            window.present(app.primaryScreen())
+            self.assertEqual(window.kind, "pdf")
+            QTest.keyClick(window, Qt.Key.Key_Down)
+            self.assertEqual(window.current_page(), 1)
+            # Left/Right change file from a middle page without turning it.
+            QTest.keyClick(window, Qt.Key.Key_Right)
+            QTest.keyClick(window, Qt.Key.Key_Left)
+            self.assertEqual(navigation, [1, -1])
+            self.assertEqual(window.current_page(), 1)
+            # Up/Down turn pages and continue to the next file past either end.
+            QTest.keyClick(window, Qt.Key.Key_Down)
+            self.assertEqual(window.current_page(), 2)
+            QTest.keyClick(window, Qt.Key.Key_Down)
+            self.assertEqual(navigation, [1, -1, 1])
+            QTest.keyClick(window, Qt.Key.Key_Up)
+            QTest.keyClick(window, Qt.Key.Key_Up)
+            self.assertEqual(window.current_page(), 0)
+            QTest.keyClick(window, Qt.Key.Key_Up)
+            self.assertEqual(navigation, [1, -1, 1, -1])
+            # Wide text: Left/Right change file even while it scrolls sideways.
+            navigation.clear()
+            window.open_document(str(wide))
+            self.audio_wait(lambda: window.phase == "ready")
+            self.assertIn(window.kind, ("text", "code"))
+            self.assertTrue(window.content.horizontalScrollBar().isVisible())
+            QTest.keyClick(window, Qt.Key.Key_Right)
+            QTest.keyClick(window, Qt.Key.Key_Left)
+            self.assertEqual(navigation, [1, -1])
+        finally:
+            window.hide()
+            window.deleteLater()
+
 
 if __name__ == "__main__":
     import faulthandler
