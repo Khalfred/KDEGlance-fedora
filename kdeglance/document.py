@@ -623,18 +623,20 @@ class DocumentWindow(PreviewWindow):
         self.apply_size(box.width(), box.height())
 
     def handle_key(self, event):
-        """Space/Escape close; Left/Right change file; Up/Down turn pages, and change file past the first/last page."""
+        """Space/Escape close; Left/Right change file. Up/Down turn pages (changing file past
+        the first/last page), scroll text, or change file when there is nothing to scroll."""
         key = event.key()
         if key in (Qt.Key.Key_Space, Qt.Key.Key_Escape):
             if not event.isAutoRepeat():
                 self.close_callback()
             return True
-        if key in (Qt.Key.Key_Left, Qt.Key.Key_Right) or (
-                key in (Qt.Key.Key_Up, Qt.Key.Key_Down) and self.kind in ("info", "folder")):
+        scrollable = isinstance(self.content, QAbstractScrollArea)
+        fits = self.kind in ("info", "folder") or (scrollable and self.content.verticalScrollBar().maximum() == 0)
+        if key in (Qt.Key.Key_Left, Qt.Key.Key_Right) or (key in (Qt.Key.Key_Up, Qt.Key.Key_Down) and fits):
             if not event.isAutoRepeat():
                 self.navigate_callback(-1 if key in (Qt.Key.Key_Left, Qt.Key.Key_Up) else 1)
             return True
-        if key in (Qt.Key.Key_Up, Qt.Key.Key_Down) and isinstance(self.content, QAbstractScrollArea):
+        if key in (Qt.Key.Key_Up, Qt.Key.Key_Down) and scrollable:
             self.scroll_lines(-3 if key == Qt.Key.Key_Up else 3)
             return True
         if self.pdf_view is not None:

@@ -51,8 +51,9 @@ journalctl --user -u kdeglance2.service -b --no-pager -n 50
   sidebar: Up/Down, PageUp/PageDown and the wheel turn pages, Home/End jump
   to the first/last page, and pressing Up/Down past the first/last page moves
   to the previous/next file. Left/Right always move to the previous/next file,
-  in every preview. In text and code Up/Down scroll three lines; in the
-  information panel they move to the previous/next file. Folders, executables (ELF/AppImage/Windows PE/scripts), launchers and
+  in every preview. In text and code Up/Down scroll three lines; when
+  the text fits without scrolling, and in the information panel, they move to
+  the previous/next file. Folders, executables (ELF/AppImage/Windows PE/scripts), launchers and
   any other file show a thumbnail (from Dolphin's cache, else the file icon) and
   properties: type, size, folder contents, location, dates, permissions, owner.
   The Dolphin action is offered for every file and folder.

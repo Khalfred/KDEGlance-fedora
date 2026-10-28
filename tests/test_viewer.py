@@ -1957,7 +1957,7 @@ class ViewerTests(unittest.TestCase):
             window.hide()
             window.deleteLater()
 
-    def test_57_info_up_down_change_file_text_up_down_scroll_three_lines(self):
+    def test_57_up_down_change_file_unless_text_scrolls_then_three_lines(self):
         from document import DocumentWindow
         blob = self.home/"documents/blob.bin"
         code = self.home/"documents/long.py"
@@ -1995,6 +1995,17 @@ class ViewerTests(unittest.TestCase):
                 QTest.keyClick(window, Qt.Key.Key_Up)
                 self.assertEqual(top_line(), "3")
             self.assertEqual(navigation, [])
+            # Text that fits without scrolling: Up/Down change file like Left/Right.
+            short = self.home/"documents/short.lrc"
+            short.write_text("".join(f"[00:{n:02}.00]line {n}\n" for n in range(22)))
+            window.open_document(str(short))
+            self.audio_wait(lambda: window.phase == "ready")
+            window.resize_document(app.primaryScreen())  # The text window, as the daemon presents it.
+            app.processEvents()
+            self.assertEqual(window.content.verticalScrollBar().maximum(), 0, (window.kind, window.size()))
+            QTest.keyClick(window, Qt.Key.Key_Up)
+            QTest.keyClick(window, Qt.Key.Key_Down)
+            self.assertEqual(navigation, [-1, 1])
         finally:
             window.hide()
             window.deleteLater()
